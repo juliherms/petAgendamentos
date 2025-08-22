@@ -10,12 +10,15 @@ import jakarta.validation.constraints.NotNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
 
 /** * Controlador REST para gerenciar serviços oferecidos pelos usuários.
  * Permite criar novos serviços, vinculados a um usuário específico.
  */
 @RestController
 @RequestMapping("/users/{idUsuario}/servicos")
+@Tag(name = "Serviços", description = "Endpoints para cadastro de serviços do provedor")
 class ServiceController {
 
     private final OfferedServiceRepository services;
@@ -37,6 +40,7 @@ class ServiceController {
      * @return ResponseEntity com o serviço criado ou erro apropriado.
      */
     @PostMapping
+    @Operation(summary = "Cadastra um novo serviço", description = "Somente para usuários com perfil PROVEDOR e conta ativa; valida preços > 0")
     public ResponseEntity<?> create(@PathVariable Long idUsuario, @Valid @RequestBody CreateServiceRequest req) {
 
         // Verifica se o usuário existe e está ativo

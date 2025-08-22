@@ -6,6 +6,8 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
 
 /**
  * Controlador REST para gerenciar usuários.
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @RestController
 @RequestMapping("/users")
+@Tag(name = "Usuários", description = "Endpoints para cadastro e verificação de usuários")
 class UserController {
 
     private final UserService service;
@@ -27,6 +30,7 @@ class UserController {
      * @return Resposta HTTP com o status e o corpo apropriados.
      */
     @PostMapping
+    @Operation(summary = "Cria um novo usuário", description = "Cria usuário e envia token de verificação via evento")
     public ResponseEntity<?> criar(@Valid @RequestBody UserApi.CreateUserRequest req) {
         try {
             var resp = service.criar(req);
@@ -43,6 +47,7 @@ class UserController {
      * @return Resposta HTTP com o status e o corpo apropriados.
      */
     @PostMapping("/{id}/verificar")
+    @Operation(summary = "Verifica contato do usuário", description = "Valida token e ativa a conta")
     public ResponseEntity<?> verify(@PathVariable("id") Long id, @Valid @RequestBody UserApi.VerifyRequest req) {
         try {
             var resp = service.verificar(id, req);

@@ -10,12 +10,15 @@ import jakarta.validation.constraints.NotNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
 
 /** * Controlador REST para gerenciar pets associados a usuários.
  * Fornece um endpoint para criar um novo pet.
  */
 @RestController
 @RequestMapping("/users/{idUsuario}/pets")
+@Tag(name = "Pets", description = "Endpoints para cadastro de pets do cliente")
 class PetController {
 
     private final PetRepository pets;
@@ -36,6 +39,7 @@ class PetController {
      * @return Resposta HTTP com o status e o corpo apropriados.
      */
     @PostMapping
+    @Operation(summary = "Cadastra um novo pet", description = "Somente para usuários com perfil CLIENTE e conta ativa")
     public ResponseEntity<?> create(@PathVariable Long idUsuario, @Valid @RequestBody CreatePetRequest req) {
 
         // pega o usuário pelo ID
