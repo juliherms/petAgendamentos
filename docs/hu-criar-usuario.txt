@@ -1,0 +1,330 @@
+História de Usuário — Cadastro de Usuários via API
+Contexto
+
+Como plataforma de serviços para pets, precisamos permitir o cadastro de usuários via API. Um usuário pode ter um dos perfis: Administrador, Cliente ou Provedor de Serviços.
+Todos os usuários compartilham os atributos básicos: nome, e-mail, telefone, endereço e senha.
+
+Objetivo
+
+Permitir que a aplicação crie e gerencie usuários com perfis distintos, habilitando:
+
+Clientes a cadastrar pets (um ou mais).
+
+Provedores de serviços a cadastrar serviços ofertados, com preço por porte do pet (p, m, g).
+
+Envio de notificação (e-mail ou SMS) para confirmação de contato ao finalizar o cadastro.
+
+História de Usuário (formato INVEST)
+
+Como visitante da plataforma
+Quero me cadastrar informando meus dados básicos e meu perfil (administrador, cliente ou provedor de serviços)
+Para poder acessar funcionalidades apropriadas ao meu perfil (gerir usuários, cadastrar pets ou ofertar serviços)
+E receber um link/código de confirmação por e-mail ou SMS para validar meu contato.
+
+Regras de Negócio
+
+Perfis de usuário
+
+ADMIN: gerencia usuários e conteúdos (fora do escopo desta história além do cadastro).
+
+CLIENTE: pode cadastrar ≥ 1 pet.
+
+PROVEDOR: pode cadastrar ≥ 1 serviço ofertado.
+
+Atributos obrigatórios (comuns)
+
+nome, email, telefone, endereco, senha.
+
+email ou telefone devem ser verificados via token/código.
+
+Pets (somente CLIENTE)
+
+Atributos: nome, idade (anos), raca, peso (kg).
+
+Deve permitir múltiplos registros.
+
+Serviços (somente PROVEDOR)
+
+Exemplo: “tosa”.
+
+Cada serviço deve possuir tabela de preços por porte: p, m, g (valores numéricos > 0).
+
+Serviço inativo não pode ser agendado (flag ativo padrão: true).
+
+Notificação de confirmação
+
+Ao criar o usuário, o sistema envia e-mail ou SMS (conforme preferência ou disponibilidade).
+
+Contém token com expiração (ex.: 24h) para confirmação.
+
+Cadastro permanece com status=pendente_verificacao até confirmação.
+
+Segurança e validação
+
+senha deve ser armazenada com hash forte (ex.: bcrypt/argon2).
+
+email deve ser único (case-insensitive) por ambiente.
+
+telefone deve aceitar E.164 (+55…).
+
+Rate-limit no envio de notificações (ex.: 5 tentativas/24h).
+
+Critérios de Aceite (Gherkin)
+Cadastro básico
+Dado que informo nome, email, telefone, endereço, senha e perfil válido
+Quando eu chamar POST /users
+Então devo receber 201 com o usuário criado (sem a senha)
+E o status do usuário deve ser "pendente_verificacao"
+E deve ser enviada uma notificação (e-mail ou SMS) com token de verificação
+
+Verificação de contato
+Dado que recebi um token de verificação válido e não expirado
+Quando eu chamar POST /users/{id}/verify com o token
+Então o status do usuário deve mudar para "ativo"
+E o campo verified_email ou verified_phone deve ser true conforme o canal utilizado
+
+Cadastro de pets (cliente)
+Dado que sou um usuário com perfil CLIENTE e conta "ativa"
+Quando eu chamar POST /users/{id}/pets com nome, idade, raca e peso
+Então devo receber 201 e o pet deve ficar associado ao meu usuário
+E devo poder cadastrar múltiplos pets
+
+Cadastro de serviços (provedor)
+Dado que sou um usuário com perfil PROVEDOR e conta "ativa"
+Quando eu chamar POST /users/{id}/services com título, descrição e preços por porte (p, m, g)
+Então devo receber 201 e o serviço deve ficar associado ao meu usuário
+E todos os preços devem ser > 0
+
+Restrições por perfil
+Dado que meu perfil é CLIENTE
+Quando eu tentar cadastrar um serviço
+Então devo receber 403
+
+Dado que meu perfil é PROVEDOR
+Quando eu tentar cadastrar um pet
+Então devo receber 403
+
+Regras de unicidade e validação
+Dado que já existe um usuário com o mesmo email
+Quando eu chamar POST /users
+Então devo receber 409 informando "email já cadastrado"
+
+Dado que envio telefone fora do padrão E.164
+Quando eu chamar POST /users
+Então devo receber 422 com erro de validação
+
+Fluxos
+
+Criação de usuário
+
+API valida payload e perfil.
+
+Cria registro com status=pendente_verificacao e roles=[perfil].
+
+Gera token de verificação (TTL 24h).
+
+Enfileira envio (e-mail/SMS).
+
+Retorna 201 com userId e metadados (sem senha).
+
+Verificação de contato
+
+Usuário acessa link ou envia código.
+
+API valida token (existência, escopo, expiração, uso único).
+
+Atualiza status=ativo e marca verified_email ou verified_phone=true.
+
+Ações pós-verificação
+
+CLIENTE: CRUD de pets.
+
+PROVEDOR: CRUD de serviços (com preços por porte).
+
+ADMIN: (fora do escopo) pode gerenciar entidades.
+
+API (Contrato Proposto)
+POST /users
+
+Request
+
+{
+  "nome": "Maria Silva",
+  "email": "maria@example.com",
+  "telefone": "+5581999990000",
+  "endereco": "Av. Boa Viagem, 1000, Recife/PE",
+  "senha": "S3nh@F0rte!",
+  "perfil": "CLIENTE",
+  "preferenciaVerificacao": "EMAIL" // ou "SMS"
+}
+
+
+Response 201
+
+{
+  "id": "usr_01J8Z2Y9Y0",
+  "nome": "Maria Silva",
+  "email": "maria@example.com",
+  "telefone": "+5581999990000",
+  "endereco": "Av. Boa Viagem, 1000, Recife/PE",
+  "perfil": "CLIENTE",
+  "status": "pendente_verificacao",
+  "verified_email": false,
+  "verified_phone": false,
+  "createdAt": "2025-08-22T12:00:00Z"
+}
+
+POST /users/{id}/verify
+
+Request
+
+{
+  "token": "tok_ABC123",
+  "canal": "EMAIL" // ou "SMS"
+}
+
+
+Response 200
+
+{
+  "id": "usr_01J8Z2Y9Y0",
+  "status": "ativo",
+  "verified_email": true,
+  "verified_phone": false
+}
+
+POST /users/{id}/pets (perfil: CLIENTE)
+
+Request
+
+{
+  "nome": "Rex",
+  "idade": 3,
+  "raca": "Vira-lata",
+  "peso": 18.2
+}
+
+
+Response 201
+
+{
+  "id": "pet_01J8Z3ABC0",
+  "usuarioId": "usr_01J8Z2Y9Y0",
+  "nome": "Rex",
+  "idade": 3,
+  "raca": "Vira-lata",
+  "peso": 18.2,
+  "createdAt": "2025-08-22T12:05:00Z"
+}
+
+POST /users/{id}/services (perfil: PROVEDOR)
+
+Request
+
+{
+  "titulo": "Tosa Completa",
+  "descricao": "Tosa higiênica e acabamento",
+  "precosPorPorte": {
+    "p": 50.0,
+    "m": 70.0,
+    "g": 90.0
+  },
+  "ativo": true
+}
+
+
+Response 201
+
+{
+  "id": "srv_01J8Z3DEF0",
+  "usuarioId": "usr_01J8Z2Y9Y0",
+  "titulo": "Tosa Completa",
+  "descricao": "Tosa higiênica e acabamento",
+  "precosPorPorte": { "p": 50.0, "m": 70.0, "g": 90.0 },
+  "ativo": true,
+  "createdAt": "2025-08-22T12:10:00Z"
+}
+
+Modelos (Esboço)
+// User
+{
+  "id": "string",
+  "nome": "string",
+  "email": "string",
+  "telefone": "string",
+  "endereco": "string",
+  "perfil": "ADMIN|CLIENTE|PROVEDOR",
+  "status": "pendente_verificacao|ativo|inativo",
+  "verified_email": "boolean",
+  "verified_phone": "boolean",
+  "createdAt": "datetime",
+  "updatedAt": "datetime"
+}
+
+// Pet
+{
+  "id": "string",
+  "usuarioId": "string",
+  "nome": "string",
+  "idade": "integer",
+  "raca": "string",
+  "peso": "number"
+}
+
+// Service (ofertado por PROVEDOR)
+{
+  "id": "string",
+  "usuarioId": "string",
+  "titulo": "string",
+  "descricao": "string",
+  "precosPorPorte": { "p": "number", "m": "number", "g": "number" },
+  "ativo": "boolean"
+}
+
+Erros Padrão
+
+400: Payload inválido.
+
+401: Não autenticado.
+
+403: Ação não permitida para o perfil.
+
+409: email já cadastrado.
+
+422: Validação de campos (ex.: telefone fora de E.164, preços ≤ 0).
+
+429: Limite de envios de verificação atingido.
+
+500: Erro interno.
+
+Observações Técnicas
+
+Senha: hash (bcrypt/argon2), nunca retornar no payload.
+
+Tokens de verificação: uso único, TTL configurável, armazenar hash do token.
+
+Idempotência: POST /users pode aceitar Idempotency-Key.
+
+Mensageria: enfileirar envios (e-mail/SMS) para resiliência.
+
+Auditabilidade: registrar criação, verificação e alterações de perfil/status.
+
+LGPD: minimizar dados sensíveis nos logs; permitir exclusão/anonimização.
+
+Definição de Pronto (DoR)
+
+Regras de validação definidas.
+
+Estratégia de notificação (e-mail/SMS) e provedores escolhidos.
+
+Modelos e endpoints revisados pela segurança.
+
+Definição de Feito (DoD)
+
+Testes (unitários, integração, contrato) aprovados.
+
+Documentação de API publicada (OpenAPI).
+
+Observabilidade (logs/metrics) disponível.
+
+Cenários de aceite acima cobertos em testes automatizados.

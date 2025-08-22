@@ -1,0 +1,329 @@
+O que é o Spring Modulith
+
+Spring Modulith é um toolkit opinativo que ajuda a estruturar uma aplicação monolítica modular: você organiza o código em módulos de negócio com fronteiras explícitas, valida as dependências entre eles, testa módulos de forma isolada, documenta automaticamente (C4/UML/“Application Module Canvas”) e observa interações em produção (métricas/traços) — tudo integrado ao Spring Boot. 
+Home
+Home
+
+Conceitos fundamentais
+
+Módulo de aplicação (Application Module): unidade funcional (ex.: customers, orders) com fronteira clara, API exportada e implementação interna encapsulada. 
+Home
+
+Modelo de módulos (ApplicationModules): representação do arranjo modular da sua base; permite inspecionar, validar e gerar documentação. 
+Home
+
+Interfaces nomeadas (@NamedInterface): definem o que um módulo expõe (as “portas” do módulo). 
+Home
+
+Regra de dependências: módulos só podem depender do que a interface nomeada do outro módulo expõe (ou do que for explicitamente permitido). 
+GitHub
+
+Eventos de aplicação: comunicação assíncrona e desacoplada entre módulos, com registry transacional e republicação automática configurável. 
+Home
+Medium
+
+Documentação gerada: diagramas C4/UML e Application Module Canvas são extraídos do arranjo real do código. 
+Home
+Home
+
+Observabilidade por módulo: endpoints de Actuator/Insight para entender o comportamento entre módulos. 
+Home
++1
+
+Quando usar
+
+Monólitos complexos que exigem manutenibilidade, evolução segura e caminho opcional a microservices no futuro.
+
+Times que desejam impedir “acoplamentos ocultos” e documentar a arquitetura a partir do código. 
+A Java geek
+
+Setup: dependências
+Maven (exemplo)
+<dependencyManagement>
+  <dependencies>
+    <dependency>
+      <groupId>org.springframework.modulith</groupId>
+      <artifactId>spring-modulith-bom</artifactId>
+      <version>1.4.2</version> <!-- ou 2.0.0-M1 conforme sua base / Boot -->
+      <type>pom</type>
+      <scope>import</scope>
+    </dependency>
+  </dependencies>
+</dependencyManagement>
+
+<dependencies>
+  <!-- Núcleo (modelo de módulos, validações, APT) -->
+  <dependency>
+    <groupId>org.springframework.modulith</groupId>
+    <artifactId>spring-modulith-starter-core</artifactId>
+  </dependency>
+
+  <!-- Testes de módulo -->
+  <dependency>
+    <groupId>org.springframework.modulith</groupId>
+    <artifactId>spring-modulith-starter-test</artifactId>
+    <scope>test</scope>
+  </dependency>
+
+  <!-- Observabilidade/Actuator em runtime -->
+  <dependency>
+    <groupId>org.springframework.modulith</groupId>
+    <artifactId>spring-modulith-starter-insight</artifactId>
+    <scope>runtime</scope>
+  </dependency>
+</dependencies>
+
+
+Observações de versões: há linha 1.4.x estável e artefatos 2.0.0-M1 (milestone). Ajuste conforme sua versão do Spring Boot e política de releases do projeto. 
+Maven Repository
++1
+Maven Central
+
+Organizacao do código
+
+Suponha um pacote base com.example.shop com dois módulos:
+
+com.example.shop
+ ├─ customers        (módulo)
+ │   ├─ api          (@NamedInterface)
+ │   └─ internal     (implementação)
+ └─ orders           (módulo)
+     ├─ api          (@NamedInterface)
+     └─ internal
+
+1) Anote o “app” como ModulitHic
+@SpringBootApplication
+@Modulithic
+public class Application {
+  public static void main(String[] args) {
+    SpringApplication.run(Application.class, args);
+  }
+}
+
+
+@Modulithic permite customizar aspectos do arranjo modular e ativa a descoberta. 
+Home
+
+2) Defina o módulo via package-info.java
+
+No pacote de customers:
+
+@ApplicationModule(
+  allowedDependencies = { "orders::api" } // exemplo (opcional): quem este módulo pode consumir
+)
+package com.example.shop.customers;
+
+import org.springframework.modulith.ApplicationModule;
+
+
+@ApplicationModule customiza metadados do módulo, incluindo tipo e dependências permitidas. 
+Home
+
+3) Exporte uma interface nomeada (API do módulo)
+
+No pacote customers.api:
+
+@NamedInterface("api")
+package com.example.shop.customers.api;
+
+import org.springframework.modulith.NamedInterface;
+
+
+Classes dentro de customers.api (por exemplo, portas/DTOs/serviços) estarão “visíveis” a outros módulos. 
+Home
+
+Validação e verificação estruturais
+
+Crie um teste que constrói o modelo de módulos e verifica regras:
+
+class ModularityTests {
+
+  ApplicationModules modules = ApplicationModules.of(Application.class);
+
+  @Test
+  void modulesShouldBeFreeOfCycles() {
+    modules.verify(); // verifica regras padrão (ciclos, acessos indevidos etc.)
+  }
+}
+
+
+ApplicationModules.of(...) inspeciona os pacotes a partir da classe da sua aplicação.
+
+verify() acusa violações (ex.: um módulo acessando implementação interna de outro). 
+Home
+BellSoft
+
+Testes de módulo em isolamento
+
+Use o starter de teste para subir apenas o módulo (e opcionalmente seus dependentes explícitos):
+
+@ApplicationModuleTest
+class OrdersModuleIT {
+
+  @Test
+  void createsOrderAndPublishesEvent(@Autowired OrderService service) {
+    // teste integrando componentes do módulo "orders"
+  }
+}
+
+
+Há slices que cuidam de repositórios, eventos e bootstrapping mínimos para o módulo. 
+Home
+
+Comunicação entre módulos com eventos
+
+O Modulith possui um Event Publication Registry que integra com o mecanismo de eventos do Spring, registrando publicações e assinantes transacionais para garantir entrega confiável e replay de pendências quando configurado:
+
+Você publica um evento de domínio (ex.: OrderPlaced) no orders.
+
+O módulo customers consome via @TransactionalEventListener.
+
+O registro grava quem deve receber e controla reentregas. 
+Home
+
+Configuração de reprocessamento em restart (exemplo de propriedade):
+
+modulith:
+  events:
+    republish-outstanding-events-on-restart: true
+
+
+Útil, mas atenção: há armadilhas se você não tratar idempotência/listeners; estudo de caso descreve impactos e como evitar. 
+Medium
+
+Externalização: é comum usar os eventos internos para publicar em Kafka de forma assíncrona e não bloquear a transação; guia prático mostra como desacoplar publicação e melhorar performance. 
+Baeldung on Kotlin
+
+Documentação automática (C4/UML & Canvas)
+
+O Modulith gera diagramas C4 (nível componente) mostrando módulos e relações, e um “Application Module Canvas” com tabela de componentes por módulo:
+
+@Test
+void writeDocs() {
+  var modules = ApplicationModules.of(Application.class);
+  new Documenter(modules)
+    .writeModulesAsPlantUml()           // C4/UML geral
+    .writeIndividualModulesAsPlantUml() // por módulo
+    .writeModuleCanvases();              // canvases tabulares
+}
+
+
+Saída padrão: pasta spring-modulith-docs no diretório de build.
+
+O Canvas lista base package, serviços, componentes Spring etc.
+
+O diagrama C4 facilita comunicação arquitetural. 
+Home
++1
+C4 model
+
+Observabilidade por módulo (Insight + Actuator)
+
+Adicione o starter Insight para expor endpoints Actuator e métricas/traços por módulo; isso ajuda a ver quem chama quem e latências entre módulos em produção (via Micrometer/OpenTelemetry). 
+Home
+Dimitar Makariev
+
+O Appendix C da documentação lista os starters e o que cada um inclui (actuator, observability etc.). 
+Home
+
+Fluxo recomendado de adoção
+
+Refatore por pacotes alinhados ao domínio (ex.: billing, catalog, checkout).
+
+Defina @ApplicationModule e @NamedInterface.
+
+Escreva testes de verificação (modules.verify()).
+
+Rode testes de módulo (@ApplicationModuleTest).
+
+Gere documentação (C4/UML/Canvas) e socialize com o time.
+
+Ative Insight/Actuator para observabilidade.
+
+Evolua integrações usando eventos entre módulos.
+
+Boas práticas e pitfalls
+
+Interfaces mínimas: exponha somente o necessário em api/. Evite leaks da implementação. 
+Home
+
+Dependências explícitas: use allowedDependencies quando fizer sentido, e cuidado com naming de interfaces. 
+GitHub
+
+Eventos idempotentes: trate reentrega, retry e ordenação (chaves de agregados; outbox pode ajudar). 
+Home
+Medium
+
+Testabilidade: prefira @ApplicationModuleTest para evitar subir o mundo. 
+Home
+
+Documentação viva: gere diagramas nos builds e inclua no PR/artefato. 
+Home
+
+Exemplo “Hello Modulith” (esqueleto simplificado)
+com.example.shop
+ ├─ Application.java (@SpringBootApplication @Modulithic)
+ ├─ customers
+ │   ├─ package-info.java (@ApplicationModule)
+ │   ├─ api (@NamedInterface "api")
+ │   │   └─ CustomerApi.java
+ │   └─ internal
+ │       └─ CustomerService.java
+ └─ orders
+     ├─ package-info.java (@ApplicationModule)
+     ├─ api (@NamedInterface "api")
+     │   └─ OrderApi.java
+     └─ internal
+         ├─ OrderService.java
+         └─ events
+             └─ OrderPlaced.java
+
+
+orders.internal.OrderService publica OrderPlaced.
+
+customers escuta via @TransactionalEventListener.
+
+Testes ApplicationModules.verify() garantem fronteiras.
+
+(Os nomes de anotações e classes estão conforme a API pública do projeto. Consulte o Javadoc para detalhes finos.) 
+Home
++1
+
+Recursos oficiais e leituras úteis
+
+Projeto / Overview oficial: visão, benefícios e integrações. 
+Home
+
+Referência completa (fundamentos, eventos, testes, documentação, produção): pontos específicos desta guia foram extraídos daqui. 
+Home
++5
+Home
++5
+Home
++5
+
+Javadoc de anotações-chave: @ApplicationModule, @NamedInterface. 
+Home
++1
+
+Tutoriais/introduções (contextualizam e dão exemplos hands-on). 
+Baeldung on Kotlin
+Piotr Minkowski
+BellSoft
+
+FAQ rápido
+
+Isso substitui microservices?
+Não. Ele posterga a decisão: você tem modularidade forte dentro do monólito e pode extrair módulos mais tarde se fizer sentido. 
+A Java geek
+
+Preciso de múltiplos módulos Maven?
+Não. A modularidade aqui é lógica (por pacotes). Você pode usar multi-módulo Maven, mas não é requisito.
+
+Como ficam diagramas?
+Documenter gera C4/UML e Canvas direto do código, sem draw.io. 
+Home
+
+E observabilidade?
+Use spring-modulith-starter-insight para métricas/traços e um endpoint Actuator que expõe a arquitetura. 
+Home
