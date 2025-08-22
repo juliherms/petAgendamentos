@@ -4,6 +4,7 @@ import com.juliherms.agendamento.pets.users.api.UserApi;
 import com.juliherms.agendamento.pets.users.internal.repo.UserRepository;
 import com.juliherms.agendamento.pets.services.internal.domain.OfferedService;
 import com.juliherms.agendamento.pets.services.internal.repo.OfferedServiceRepository;
+import com.juliherms.agendamento.pets.services.internal.exception.ServicesExceptionHandler;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -33,11 +34,10 @@ class ServiceController {
     record CreateServiceRequest(@NotBlank String titulo, @NotBlank String descricao, @NotNull Prices precosPorPorte, boolean ativo) {}
 
     /**
-     * Cria um novo serviço oferecido por um usuário.
-     *
-     * @param idUsuario ID do usuário que está oferecendo o serviço.
+     * Endpoint para cadastrar um novo serviço oferecido por um usuário.
+     * @param idUsuario ID do usuário que oferece o serviço.
      * @param req Dados do serviço a ser criado.
-     * @return ResponseEntity com o serviço criado ou erro apropriado.
+     * @return Resposta HTTP com o status e o corpo apropriados.
      */
     @PostMapping
     @Operation(summary = "Cadastra um novo serviço", description = "Somente para usuários com perfil PROVEDOR e conta ativa; valida preços > 0")
@@ -47,13 +47,14 @@ class ServiceController {
         var user = users.findById(idUsuario).orElse(null);
 
         // Verifica se o usuário é um provedor
-        if (user == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse("usuario não encontrado"));
-        if (user.getStatus() != UserApi.Status.ativo) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorResponse("conta não ativa"));
-        if (user.getPerfil() != UserApi.Perfil.PROVEDOR) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorResponse("ação não permitida para o perfil"));
+        //TODO: verficiar esta exception. Esta incorreta
+        if (user == null) throw new ServicesExceptionHandler.ServicoNaoEncontradoException("usuario não encontrado");
+        if (user.getStatus() != UserApi.Status.ativo) throw new ServicesExceptionHandler.ServicoInativoException("conta não ativa");
+        if (user.getPerfil() != UserApi.Perfil.PROVEDOR) throw new ServicesExceptionHandler.ServicoInativoException("ação não permitida para o perfil");
 
         // Valida os preços dos serviços
         if (req.precosPorPorte.p() <= 0 || req.precosPorPorte.m() <= 0 || req.precosPorPorte.g() <= 0) {
-            return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(new ErrorResponse("preços devem ser > 0"));
+            throw new ServicesExceptionHandler.PrecosInvalidosException("preços devem ser > 0");
         }
 
         // Cria e salva o serviço oferecido
@@ -70,8 +71,6 @@ class ServiceController {
 
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
-
-    record ErrorResponse(String message) {}
 }
 
 

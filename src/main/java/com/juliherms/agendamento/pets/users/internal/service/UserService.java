@@ -7,6 +7,7 @@ import com.juliherms.agendamento.pets.users.api.UserApi.Status;
 import com.juliherms.agendamento.pets.users.internal.domain.User;
 import com.juliherms.agendamento.pets.users.internal.domain.VerificationToken;
 import com.juliherms.agendamento.pets.users.api.UserCreatedEvent;
+import com.juliherms.agendamento.pets.users.internal.exception.UsersExceptionHandler;
 import com.juliherms.agendamento.pets.users.internal.repo.UserRepository;
 import com.juliherms.agendamento.pets.users.internal.repo.VerificationTokenRepository;
 import jakarta.transaction.Transactional;
@@ -21,7 +22,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Serviço para gerenciamento de usuários, incluindo criação e verificação.
+ * Serviço responsável pela criação e verificação de usuários.
+ * Contém métodos para criar um novo usuário e verificar um usuário existente com um token.
  */
 @Service
 public class UserService {
@@ -37,18 +39,21 @@ public class UserService {
     }
 
     /**
-     * Cria um novo usuário, gera um token de verificação e publica um evento para envio do token.
-     * @param req Dados para criação do usuário.
+     * Cria um novo usuário com os dados fornecidos.
+     * @param req Dados do usuário a ser criado.
      * @return Detalhes do usuário criado.
-     * @throws ConflictException se o email já estiver cadastrado.
+     * @throws UsersExceptionHandler.EmailJaCadastradoException se o email já estiver cadastrado.
      */
     @Transactional
     public UserApi.UserResponse criar(UserApi.CreateUserRequest req) {
+
+        // Verifica se o email já está cadastrado
         String normalizedEmail = req.email().toLowerCase(Locale.ROOT);
         userRepository.findByEmailIgnoreCase(normalizedEmail).ifPresent(u -> {
-            throw new ConflictException("email já cadastrado");
+            throw new UsersExceptionHandler.EmailJaCadastradoException("email já cadastrado");
         });
 
+        // Cria o usuário com os dados fornecidos
         User user = new User();
         user.setNome(req.nome());
         user.setEmail(normalizedEmail);
@@ -61,6 +66,7 @@ public class UserService {
         user.setTelefoneVerificado(false);
         user = userRepository.save(user);
 
+        // Gera um token de verificação para o usuário
         String rawToken = UUID.randomUUID().toString().replace("-", "");
         VerificationToken token = new VerificationToken();
         token.setIdUsuario(user.getId());
@@ -72,6 +78,7 @@ public class UserService {
 
         tokenRepository.save(token);
 
+        // Publica um evento de criação de usuário para iniciar o processo de verificação
         events.publishEvent(new UserCreatedEvent(
                 user.getId(),
                 user.getEmail(),
@@ -81,6 +88,7 @@ public class UserService {
                 expiresAt
         ));
 
+        // Retorna os detalhes do usuário criado
         return new UserApi.UserResponse(
                 user.getId(),
                 user.getNome(),
@@ -96,29 +104,35 @@ public class UserService {
     }
 
     /**
-     * Verifica o usuário usando o token fornecido.
+     * Verifica o usuário com o token fornecido.
      * @param idUsuario ID do usuário a ser verificado.
-     * @param req Dados da verificação, incluindo o canal e o token.
+     * @param req Dados de verificação contendo o token e o canal.
      * @return Detalhes do usuário após a verificação.
-     * @throws NotFoundException se o usuário não for encontrado.
-     * @throws ValidationException se o token for inválido ou expirado.
+     * @throws UsersExceptionHandler.UsuarioNaoEncontradoException se o usuário não for encontrado.
+     * @throws UsersExceptionHandler.TokenInvalidoException se o token for inválido ou expirado.
      */
     @Transactional
     public UserApi.UserResponse verificar(Long idUsuario, UserApi.VerifyRequest req) {
 
-        User user = userRepository.findById(idUsuario).orElseThrow(() -> new NotFoundException("usuario não encontrado"));
+        // Verifica se o usuário existe
+        User user = userRepository.findById(idUsuario).orElseThrow(() -> new UsersExceptionHandler.UsuarioNaoEncontradoException("usuario não encontrado"));
 
+        // Verifica se o canal de verificação é válido
         Optional<VerificationToken> opt =
                 tokenRepository.findTopByidUsuarioAndCanalAndUtilizadoIsFalseAndExpiresAtAfterOrderByExpiresAtDesc(
                 user.getId(), req.canal(), Instant.now()
         );
 
-        VerificationToken token = opt.orElseThrow(() -> new ValidationException("token inválido ou expirado"));
+        // Se não encontrar um token válido, lança uma exceção
+        VerificationToken token = opt.orElseThrow(() -> new UsersExceptionHandler.TokenInvalidoException("token inválido ou expirado"));
 
+        // Verifica se o token fornecido corresponde ao token armazenado
         if (!BCrypt.checkpw(req.token(), token.getTokenHash())) {
-            throw new ValidationException("token inválido ou expirado");
+            throw new UsersExceptionHandler.TokenInvalidoException("token inválido ou expirado");
         }
+
         token.setUtilizado(true);
+
         // salva o token como utilizado
         tokenRepository.save(token);
 
@@ -140,10 +154,6 @@ public class UserService {
                 user.getCreatedAt()
         );
     }
-
-    public static class NotFoundException extends RuntimeException { public NotFoundException(String m){super(m);} }
-    public static class ConflictException extends RuntimeException { public ConflictException(String m){super(m);} }
-    public static class ValidationException extends RuntimeException { public ValidationException(String m){super(m);} }
 }
 
 

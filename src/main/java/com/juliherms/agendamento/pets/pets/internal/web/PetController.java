@@ -4,6 +4,7 @@ import com.juliherms.agendamento.pets.users.api.UserApi;
 import com.juliherms.agendamento.pets.users.internal.repo.UserRepository;
 import com.juliherms.agendamento.pets.pets.internal.domain.Pet;
 import com.juliherms.agendamento.pets.pets.internal.repo.PetRepository;
+import com.juliherms.agendamento.pets.pets.internal.exception.PetsExceptionHandler;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -32,10 +33,9 @@ class PetController {
     record CreatePetRequest(@NotBlank String nome, @NotNull Integer idade, @NotBlank String raca, @NotNull Double peso) {}
 
     /**
-     * Endpoint para criar um novo pet associado a um usuário.
-     *
+     * Endpoint para cadastrar um novo pet associado a um usuário.
      * @param idUsuario ID do usuário ao qual o pet será associado.
-     * @param req Requisição contendo os dados do pet a ser criado.
+     * @param req Dados do pet a ser criado.
      * @return Resposta HTTP com o status e o corpo apropriados.
      */
     @PostMapping
@@ -45,10 +45,11 @@ class PetController {
         // pega o usuário pelo ID
         var user = users.findById(idUsuario).orElse(null);
 
-       // verifica se o usuário existe e se está ativo e é do perfil CLIENTE
-        if (user == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse("usuario não encontrado"));
-        if (user.getStatus() != UserApi.Status.ativo) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorResponse("conta não ativa"));
-        if (user.getPerfil() != UserApi.Perfil.CLIENTE) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorResponse("ação não permitida para o perfil"));
+        // verifica se o usuário existe e se está ativo e é do perfil CLIENTE
+        //TODO: verificar esta exception. Esta incorreta
+        if (user == null) throw new PetsExceptionHandler.PetNaoEncontradoException("usuario não encontrado");
+        if (user.getStatus() != UserApi.Status.ativo) throw new PetsExceptionHandler.LimitePetsExcedidoException("conta não ativa");
+        if (user.getPerfil() != UserApi.Perfil.CLIENTE) throw new PetsExceptionHandler.LimitePetsExcedidoException("ação não permitida para o perfil");
 
         // cria o pet e salva no repositório
         Pet pet = new Pet();
@@ -57,12 +58,13 @@ class PetController {
         pet.setIdade(req.idade());
         pet.setRaca(req.raca());
         pet.setPeso(req.peso());
+
         var saved = pets.save(pet);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
-    record ErrorResponse(String message) {}
+
 }
 
 

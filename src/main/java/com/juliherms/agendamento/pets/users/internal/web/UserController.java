@@ -32,12 +32,8 @@ class UserController {
     @PostMapping
     @Operation(summary = "Cria um novo usuário", description = "Cria usuário e envia token de verificação via evento")
     public ResponseEntity<?> criar(@Valid @RequestBody UserApi.CreateUserRequest req) {
-        try {
-            var resp = service.criar(req);
-            return ResponseEntity.status(HttpStatus.CREATED).body(resp);
-        } catch (UserService.ConflictException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse("email já cadastrado"));
-        }
+        var resp = service.criar(req);
+        return ResponseEntity.status(HttpStatus.CREATED).body(resp);
     }
 
     /** Endpoint para verificar um usuário usando um token de verificação.
@@ -49,17 +45,11 @@ class UserController {
     @PostMapping("/{id}/verificar")
     @Operation(summary = "Verifica contato do usuário", description = "Valida token e ativa a conta")
     public ResponseEntity<?> verify(@PathVariable("id") Long id, @Valid @RequestBody UserApi.VerifyRequest req) {
-        try {
-            var resp = service.verificar(id, req);
-            return ResponseEntity.ok(resp);
-        } catch (UserService.NotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(e.getMessage()));
-        } catch (UserService.ValidationException e) {
-            return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(new ErrorResponse(e.getMessage()));
-        }
+        var resp = service.verificar(id, req);
+        return ResponseEntity.ok(resp);
     }
 
-    record ErrorResponse(String message) {}
+
 }
 
 
