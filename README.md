@@ -7,7 +7,8 @@ API modular (Spring Boot + Spring Modulith) para cadastro de usuários, pets e s
   - `users`: criação e verificação de usuários (gera token e publica evento de notificação).
   - `pets`: cadastro de pets (perfil CLIENTE).
   - `services`: cadastro de serviços (perfil PROVEDOR) com preços por porte.
-  - `notifications`: listener de eventos que registra no log o token de verificação para testes.
+  - `verificador`: processa eventos de criação e envia verificação via e-mail ou SMS (simulado).
+  - `notifications`: módulo para futuras implementações de notificações.
 - Segurança de dados: senha com hash BCrypt; token de verificação armazenado como hash (uso único, TTL 24h).
 - Banco: H2 em memória para desenvolvimento.
 
@@ -51,7 +52,7 @@ O bean de configuração se encontra em `com.juliherms.agendamento.pets.config.O
     { "token": "<token do log>", "canal": "EMAIL" }
     ```
 
-Observação: após criar o usuário, procure no log uma linha `[NOTIFY]` contendo `token` e `expiresAt` para uso no endpoint de verificação.
+Observação: após criar o usuário, o módulo `verificador` processa automaticamente o evento e envia a verificação via e-mail ou SMS conforme preferência. Procure no log as linhas `[VERIFICADOR]`, `[EMAIL]` ou `[SMS]` para acompanhar o processo.
 
 ### Pets (CLIENTE)
 - POST `/users/{idUsuario}/pets` — cadastra pet associado ao usuário CLIENTE ativo.
@@ -91,7 +92,7 @@ Observação: após criar o usuário, procure no log uma linha `[NOTIFY]` conten
 ## Arquitetura (Spring Modulith)
 - `@Modulithic` aplicado na classe `PetsApplication`.
 - Cada módulo possui `package-info.java` com `@ApplicationModule` e, quando aplicável, uma interface de API exposta.
-- Evento de domínio: `users.api.UserCreatedEvent` publicado ao criar o usuário; o módulo `notifications` consome e registra o token no log (ambiente de dev).
+- Evento de domínio: `users.api.UserCreatedEvent` publicado ao criar o usuário; o módulo `verificador` consome e envia verificação via e-mail/SMS conforme preferência do usuário.
 - Teste de verificação estrutural: `ModularityVerificationTests` executa `ApplicationModules.verify()`.
 
 ## Configuração
