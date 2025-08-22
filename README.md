@@ -10,9 +10,32 @@ API modular (Spring Boot + Spring Modulith) para cadastro de usuários, pets e s
   - `verificador`: processa eventos de criação e envia verificação via e-mail ou SMS (simulado).
   - `notifications`: módulo para futuras implementações de notificações.
 - Segurança de dados: senha com hash BCrypt; token de verificação armazenado como hash (uso único, TTL 24h).
-- Banco: H2 em memória para desenvolvimento.
+- Banco: MySQL 8.0 com configurações específicas por ambiente (dev/prod).
+
+## Pré-requisitos
+- Java 21
+- Maven 3.6+
+- MySQL 8.0+ ou Docker
 
 ## Como Executar
+
+### 1. Banco de Dados MySQL
+
+**Opção A: Docker (Recomendado para desenvolvimento)**
+```bash
+# Inicia o MySQL
+docker-compose up -d
+
+# Verifica se está rodando
+docker-compose ps
+```
+
+**Opção B: MySQL Local**
+- Instale MySQL 8.0+
+- Crie o banco `pets`
+- Configure usuário e senha em `src/main/resources/application-dev.properties`
+
+### 2. Aplicação
 ```bash
 ./mvnw spring-boot:run
 ```
@@ -96,9 +119,36 @@ Observação: após criar o usuário, o módulo `verificador` processa automatic
 - Teste de verificação estrutural: `ModularityVerificationTests` executa `ApplicationModules.verify()`.
 
 ## Configuração
-- H2 em memória: console habilitado (`/h2-console`).
-- Propriedades em `src/main/resources/application.properties`.
+
+### Perfis de Ambiente
+- **dev**: `src/main/resources/application-dev.properties` - Desenvolvimento local
+- **prod**: `src/main/resources/application-prod.properties` - Produção
+
+### Banco de Dados
+- **Desenvolvimento**: MySQL local ou Docker com `create-drop` (tabelas recriadas a cada restart)
+- **Produção**: MySQL com `validate` (validação de schema)
+
+### Variáveis de Ambiente
+Copie `env.example` para `.env` e configure:
+- `DB_HOST`, `DB_PORT`, `DB_NAME`
+- `DB_USERNAME`, `DB_PASSWORD`
+- `SPRING_PROFILES_ACTIVE`
 
 ## Desenvolvimento
 - Build: `./mvnw clean verify`
 - Testes: `./mvnw test`
+
+## Comandos Docker Úteis
+```bash
+# Iniciar MySQL
+docker-compose up -d
+
+# Parar MySQL
+docker-compose down
+
+# Ver logs do MySQL
+docker-compose logs mysql
+
+# Acessar MySQL CLI
+docker exec -it pets-mysql mysql -u root -p
+```
