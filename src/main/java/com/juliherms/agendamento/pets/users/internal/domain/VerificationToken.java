@@ -7,27 +7,31 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "verification_tokens")
+@Table(name = "verification_tokens",
+        indexes = {
+                @Index(name = "idx_verification_token_lookup",
+                        columnList = "id_usuario, canal, utilizado, expires_at")
+        })
 public class VerificationToken {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(name = "id_usuario", nullable = false)
     private Long idUsuario;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "canal", nullable = false)
     private CanalVerificacao canal;
 
-    @Column(nullable = false)
+    @Column(name = "token_hash", nullable = false)
     private String tokenHash;
 
-    @Column(nullable = false)
+    @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
-    @Column(nullable = false)
+    @Column(name = "utilizado", nullable = false)
     private boolean utilizado;
 
     public Long getId() {
