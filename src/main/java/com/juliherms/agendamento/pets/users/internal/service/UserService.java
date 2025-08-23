@@ -119,7 +119,7 @@ public class UserService {
 
         // Verifica se o canal de verificação é válido
         Optional<VerificationToken> opt =
-                tokenRepository.findTopByidUsuarioAndCanalAndUtilizadoIsFalseAndExpiresAtAfterOrderByExpiresAtDesc(
+                tokenRepository.findTopByIdUsuarioAndCanalAndUtilizadoIsFalseAndExpiresAtAfterOrderByExpiresAtDesc(
                 user.getId(), req.canal(), Instant.now()
         );
 

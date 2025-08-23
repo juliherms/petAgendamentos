@@ -8,9 +8,9 @@ import java.time.Instant;
 import java.util.Optional;
 
 public interface VerificationTokenRepository extends JpaRepository<VerificationToken, Long> {
-    Optional<VerificationToken> findTopByidUsuarioAndCanalAndUtilizadoIsFalseAndExpiresAtAfterOrderByExpiresAtDesc(Long userId,
-                                                                                                           UserApi.CanalVerificacao canal,
-                                                                                                           Instant now);
+    Optional<VerificationToken> findTopByIdUsuarioAndCanalAndUtilizadoIsFalseAndExpiresAtAfterOrderByExpiresAtDesc(Long userId,
+                                                                                                                   UserApi.CanalVerificacao canal,
+                                                                                                                   Instant now);
 }
 
 
