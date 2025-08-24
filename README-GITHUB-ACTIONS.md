@@ -119,6 +119,11 @@ Para testar localmente o que o CI fará:
 - **Solução**: ✅ Já corrigido nos workflows com `chmod +x ./mvnw`
 - **Causa**: Arquivos do Git no Windows não preservam permissões de execução
 
+### Erro do Docker Compose
+- **Sintoma**: `docker-compose: command not found`
+- **Solução**: ✅ Já corrigido nos workflows usando `docker compose` (versão moderna)
+- **Causa**: GitHub Actions usa versão mais recente do Docker
+
 ### Timeout
 - Aumente `timeout-minutes` no YAML
 - Otimize testes lentos

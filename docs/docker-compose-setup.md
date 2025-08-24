@@ -65,7 +65,13 @@ spring.jpa.defer-datasource-initialization=true
 ```yaml
 - name: Start MySQL with Docker Compose
   run: |
-    docker-compose up -d mysql
+    # Verifica se Docker está disponível
+    docker --version
+    docker compose version
+    
+    # Inicia MySQL
+    docker compose up -d mysql
+    
     # Aguarda MySQL estar pronto
     timeout 60 bash -c 'until docker exec pets-mysql mysqladmin ping -h"localhost" -u"pets_user" -p"pets_pass" --silent; do sleep 2; done'
     echo "MySQL is ready!"
@@ -75,7 +81,7 @@ spring.jpa.defer-datasource-initialization=true
 ```yaml
 - name: Show MySQL status
   run: |
-    docker-compose ps
+    docker compose ps
     docker exec pets-mysql mysql -u pets_user -ppets_pass -e "SHOW DATABASES;"
 ```
 
@@ -127,7 +133,7 @@ spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
 ### Testar com MySQL (Realista)
 ```bash
 # Iniciar MySQL
-docker-compose up -d mysql
+docker compose up -d mysql
 
 # Aguardar MySQL estar pronto
 timeout 60 bash -c 'until docker exec pets-mysql mysqladmin ping -h"localhost" -u"pets_user" -p"pets_pass" --silent; do sleep 2; done'
@@ -141,13 +147,13 @@ timeout 60 bash -c 'until docker exec pets-mysql mysqladmin ping -h"localhost" -
 ### MySQL não inicia
 ```bash
 # Verificar logs
-docker-compose logs mysql
+docker compose logs mysql
 
 # Verificar se a porta está livre
 netstat -an | grep 3306
 
 # Reiniciar container
-docker-compose restart mysql
+docker compose restart mysql
 ```
 
 ### Timeout na conexão

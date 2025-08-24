@@ -49,14 +49,20 @@ jobs:
 
       - name: Start MySQL with Docker Compose
         run: |
-          docker-compose up -d mysql
+          # Verifica se Docker está disponível
+          docker --version
+          docker compose version
+          
+          # Inicia MySQL
+          docker compose up -d mysql
+          
           # Aguarda MySQL estar pronto
           timeout 60 bash -c 'until docker exec pets-mysql mysqladmin ping -h"localhost" -u"pets_user" -p"pets_pass" --silent; do sleep 2; done'
           echo "MySQL is ready!"
 
       - name: Show MySQL status
         run: |
-          docker-compose ps
+          docker compose ps
           docker exec pets-mysql mysql -u pets_user -ppets_pass -e "SHOW DATABASES;"
 
       - name: Build & run tests (unit + component)
