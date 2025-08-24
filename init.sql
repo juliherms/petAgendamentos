@@ -22,6 +22,10 @@ USE pets;
 -- Comentário sobre as tabelas que serão criadas automaticamente pelo Hibernate
 -- As tabelas serão criadas automaticamente com base nas entidades JPA:
 -- - users
--- - verification_tokens  
+-- - verification_tokens
 -- - pets
 -- - services
+
+-- Índice composto para acelerar a busca de tokens de verificação
+CREATE INDEX idx_verification_token_lookup
+    ON verification_tokens (id_usuario, canal, utilizado, expires_at);
