@@ -15,6 +15,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Locale;
@@ -31,11 +32,31 @@ public class UserService {
     private final UserRepository userRepository;
     private final VerificationTokenRepository tokenRepository;
     private final ApplicationEventPublisher events;
+    private final SecureRandom secureRandom = new SecureRandom();
 
     public UserService(UserRepository userRepository, VerificationTokenRepository tokenRepository, ApplicationEventPublisher events) {
         this.userRepository = userRepository;
         this.tokenRepository = tokenRepository;
         this.events = events;
+    }
+
+    /**
+     * Gera um token de validação contendo números e letras maiúsculas com até 6 caracteres.
+     * @return String contendo o token gerado.
+     */
+    private String gerarTokenValidacao() {
+        StringBuilder token = new StringBuilder();
+        String caracteres = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        
+        // Gera um token com comprimento entre 4 e 6 caracteres
+        int comprimento = secureRandom.nextInt(3) + 4; // 4, 5 ou 6 caracteres
+        
+        for (int i = 0; i < comprimento; i++) {
+            int indice = secureRandom.nextInt(caracteres.length());
+            token.append(caracteres.charAt(indice));
+        }
+        
+        return token.toString();
     }
 
     /**
@@ -67,11 +88,11 @@ public class UserService {
         user = userRepository.save(user);
 
         // Gera um token de verificação para o usuário
-        String rawToken = UUID.randomUUID().toString().replace("-", "");
+        String rawToken = gerarTokenValidacao();
         VerificationToken token = new VerificationToken();
         token.setIdUsuario(user.getId());
         token.setCanal(req.preferenciaVerificacao());
-        token.setTokenHash(BCrypt.hashpw(rawToken, BCrypt.gensalt()));
+        token.setTokenHash(rawToken);
         Instant expiresAt = Instant.now().plus(Duration.ofHours(24));
         token.setExpiresAt(expiresAt);
         token.setUtilizado(false);
