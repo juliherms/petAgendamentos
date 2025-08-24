@@ -56,14 +56,25 @@ jobs:
           # Inicia MySQL
           docker compose up -d mysql
           
-          # Aguarda MySQL estar pronto
-          timeout 60 bash -c 'until docker exec pets-mysql mysqladmin ping -h"localhost" -u"pets_user" -p"pets_pass" --silent; do sleep 2; done'
+          # Aguarda MySQL estar pronto (usando root primeiro)
+          echo "Waiting for MySQL to be ready..."
+          timeout 120 bash -c 'until docker exec pets-mysql mysqladmin ping -h"localhost" -u"root" -p"root" --silent; do sleep 3; echo "Waiting..."; done'
+          
+          # Aguarda um pouco mais para garantir que o usuário pets_user foi criado
+          sleep 10
+          
+          # Verifica se o usuário pets_user existe e pode conectar
+          echo "Verifying pets_user connection..."
+          timeout 30 bash -c 'until docker exec pets-mysql mysql -u pets_user -ppets_pass -e "SELECT 1;" --silent; do sleep 2; echo "Waiting for pets_user..."; done'
+          
           echo "MySQL is ready!"
 
       - name: Show MySQL status
         run: |
           docker compose ps
+          echo "Testing connection with pets_user..."
           docker exec pets-mysql mysql -u pets_user -ppets_pass -e "SHOW DATABASES;"
+          echo "Connection successful!"
 
       - name: Build & run tests (unit + component)
         run: |

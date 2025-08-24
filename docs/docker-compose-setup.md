@@ -72,8 +72,17 @@ spring.jpa.defer-datasource-initialization=true
     # Inicia MySQL
     docker compose up -d mysql
     
-    # Aguarda MySQL estar pronto
-    timeout 60 bash -c 'until docker exec pets-mysql mysqladmin ping -h"localhost" -u"pets_user" -p"pets_pass" --silent; do sleep 2; done'
+    # Aguarda MySQL estar pronto (usando root primeiro)
+    echo "Waiting for MySQL to be ready..."
+    timeout 120 bash -c 'until docker exec pets-mysql mysqladmin ping -h"localhost" -u"root" -p"root" --silent; do sleep 3; echo "Waiting..."; done'
+    
+    # Aguarda um pouco mais para garantir que o usuário pets_user foi criado
+    sleep 10
+    
+    # Verifica se o usuário pets_user existe e pode conectar
+    echo "Verifying pets_user connection..."
+    timeout 30 bash -c 'until docker exec pets-mysql mysql -u pets_user -ppets_pass -e "SELECT 1;" --silent; do sleep 2; echo "Waiting for pets_user..."; done'
+    
     echo "MySQL is ready!"
 ```
 
@@ -162,9 +171,10 @@ docker compose restart mysql
 - Ajustar configurações de pool de conexões
 
 ### Erro de autenticação
-- Verificar credenciais no `docker-compose.yml`
-- Confirmar se o usuário foi criado
-- Verificar permissões do banco
+- **Sintoma**: `ERROR 1045 (28000): Access denied for user 'pets_user'@'localhost'`
+- **Solução**: ✅ Já corrigido nos workflows com health check melhorado
+- **Causa**: MySQL ainda não terminou de inicializar ou usuário não foi criado
+- **Prevenção**: Usar root primeiro, aguardar inicialização completa, verificar pets_user
 
 ## Próximos Passos
 

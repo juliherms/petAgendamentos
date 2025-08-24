@@ -124,6 +124,11 @@ Para testar localmente o que o CI fará:
 - **Solução**: ✅ Já corrigido nos workflows usando `docker compose` (versão moderna)
 - **Causa**: GitHub Actions usa versão mais recente do Docker
 
+### Erro de Acesso MySQL
+- **Sintoma**: `ERROR 1045 (28000): Access denied for user 'pets_user'@'localhost'`
+- **Solução**: ✅ Já corrigido nos workflows com health check melhorado
+- **Causa**: MySQL ainda não terminou de inicializar completamente
+
 ### Timeout
 - Aumente `timeout-minutes` no YAML
 - Otimize testes lentos
