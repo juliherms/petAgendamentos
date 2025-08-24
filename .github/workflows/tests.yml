@@ -39,6 +39,9 @@ jobs:
           java-version: '21'
           cache: maven
 
+      - name: Make Maven Wrapper executable
+        run: chmod +x ./mvnw
+
       - name: Show Java & Maven versions
         run: |
           java -version
