@@ -1,0 +1,280 @@
+Perfeito! Vou te guiar como um especialista Java para montar um GitHub Actions que execute os testes de um projeto Spring Boot + Maven usando Java 21. Vou deixar um fluxo base (simples e robusto) e, depois, alguns ajustes opcionais úteis.
+
+Passo a passo
+1) Estrutura do repositório
+
+Certifique-se de ter o wrapper do Maven (recomendado pelo Spring):
+
+mvn -N io.takari:maven:wrapper
+
+
+Isso cria mvnw, mvnw.cmd e o diretório .mvn/.
+
+Usar o wrapper evita diferenças de versão do Maven no CI.
+
+2) Crie o workflow
+
+No repositório, crie o arquivo:
+
+.github/workflows/tests.yml
+
+
+Cole o YAML abaixo (explicado em seguida):
+
+name: CI - Maven Tests (Java 21)
+
+on:
+  push:
+    branches: [ "**" ]
+    paths:
+      - "pom.xml"
+      - "src/**"
+      - ".github/workflows/tests.yml"
+  pull_request:
+    branches: [ "**" ]
+    paths:
+      - "pom.xml"
+      - "src/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      MAVEN_OPTS: "-XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xmx2g -Dstyle.color=always"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21 (Temurin) + cache Maven
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Show Java & Maven versions
+        run: |
+          java -version
+          if [ -f ./mvnw ]; then ./mvnw -v; else mvn -v; fi
+
+      - name: Build & run tests (unit + component)
+        run: |
+          if [ -f ./mvnw ]; then MVN=./mvnw; else MVN=mvn; fi
+          $MVN -B -ntp -U clean verify
+
+      # Publica relatórios de testes sempre (útil para debugar falhas no PR)
+      - name: Upload Surefire/Failsafe reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maven-test-reports
+          path: |
+            **/target/surefire-reports/**
+            **/target/failsafe-reports/**
+          if-no-files-found: ignore
+
+O que esse workflow faz
+
+Dispara em push e pull_request quando há mudanças em pom.xml, src/** ou no próprio workflow.
+
+Instala o JDK 21 (Temurin) e usa cache do Maven automaticamente.
+
+Roda clean verify (inclui testes unitários e, se você usa Failsafe, os de integração).
+
+Publica relatórios do Surefire/Failsafe como artefato, mesmo quando a pipeline falha (facilita o diagnóstico).
+
+3) Ajustes recomendados no pom.xml
+
+Garanta que seu projeto está compilando para Java 21 e com plugins modernos dos testes:
+
+<properties>
+  <java.version>21</java.version>
+  <maven.compiler.release>21</maven.compiler.release>
+  <maven.compiler.plugin.version>3.11.0</maven.compiler.plugin.version>
+  <maven.surefire.plugin.version>3.2.5</maven.surefire.plugin.version>
+  <maven.failsafe.plugin.version>3.2.5</maven.failsafe.plugin.version>
+</properties>
+
+<build>
+  <plugins>
+    <plugin>
+      <artifactId>maven-compiler-plugin</artifactId>
+      <version>${maven.compiler.plugin.version}</version>
+      <configuration>
+        <release>${maven.compiler.release}</release>
+      </configuration>
+    </plugin>
+
+    <plugin>
+      <artifactId>maven-surefire-plugin</artifactId>
+      <version>${maven.surefire.plugin.version}</version>
+      <configuration>
+        <!-- exemplos úteis -->
+        <trimStackTrace>true</trimStackTrace>
+        <reuseForks>true</reuseForks>
+      </configuration>
+    </plugin>
+
+    <!-- Se você tiver testes de integração com Failsafe -->
+    <plugin>
+      <artifactId>maven-failsafe-plugin</artifactId>
+      <version>${maven.failsafe.plugin.version}</version>
+      <executions>
+        <execution>
+          <goals>
+            <goal>integration-test</goal>
+            <goal>verify</goal>
+          </goals>
+        </execution>
+      </executions>
+    </plugin>
+  </plugins>
+</build>
+
+
+Dica: se você não usa Failsafe, o verify rodará só os testes unitários (Surefire). Se usa, o verify garante a fase correta para integração.
+
+4) (Opcional) Garantir JDK 21 via Toolchains
+
+Se quiser forçar JDK 21 também nas máquinas locais (além do CI), adicione ~/.m2/toolchains.xml na sua máquina, e uma versão controlada no repositório (por exemplo, em docs/dev/toolchains.xml) para referência:
+
+<?xml version="1.0" encoding="UTF8"?>
+<toolchains>
+  <toolchain>
+    <type>jdk</type>
+    <provides>
+      <id>temurin-21</id>
+      <version>21</version>
+      <vendor>eclipse</vendor>
+    </provides>
+    <configuration>
+      <jdkHome>/path/para/jdk-21</jdkHome>
+    </configuration>
+  </toolchain>
+</toolchains>
+
+
+E no pom.xml (opcional) referencie a toolchain:
+
+<build>
+  <plugins>
+    <plugin>
+      <groupId>org.apache.maven.plugins</groupId>
+      <artifactId>maven-toolchains-plugin</artifactId>
+      <version>3.1.0</version>
+      <executions>
+        <execution>
+          <goals><goal>toolchain</goal></goals>
+        </execution>
+      </executions>
+      <configuration>
+        <toolchains>
+          <jdk>
+            <version>[21,)</version>
+          </jdk>
+        </toolchains>
+      </configuration>
+    </plugin>
+  </plugins>
+</build>
+
+5) (Opcional) Separar jobs de Unit vs Integração
+
+Se quiser pipelines mais rápidas em PRs, você pode separar em dois jobs (unitários sempre; integração só em main), ou condicionar os ITs a um label do PR. Exemplo rápido de condição por branch:
+
+      - name: Run only unit tests on PRs; full verify on main
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            CMD="verify"
+          else
+            CMD="test -DskipITs"
+          fi
+          if [ -f ./mvnw ]; then MVN=./mvnw; else MVN=mvn; fi
+          $MVN -B -ntp -U clean $CMD
+
+
+(Configure -DskipITs no seu pom.xml para pular Failsafe.)
+
+6) (Opcional) Serviços de apoio para testes de integração
+
+Se seus testes precisam de Postgres, Redis etc., habilite services no job:
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: app
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+        ports: [ "5432:5432" ]
+        options: >-
+          --health-cmd="pg_isready -U app -d app"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+
+E no Spring defina spring.datasource.* apropriado para o perfil de teste.
+
+7) (Opcional) Cobertura com JaCoCo
+
+Se quiser falhar o build abaixo de um threshold:
+
+<build>
+  <plugins>
+    <plugin>
+      <groupId>org.jacoco</groupId>
+      <artifactId>jacoco-maven-plugin</artifactId>
+      <version>0.8.12</version>
+      <executions>
+        <execution>
+          <goals><goal>prepare-agent</goal></goals>
+        </execution>
+        <execution>
+          <id>report</id>
+          <phase>verify</phase>
+          <goals><goal>report</goal></goals>
+        </execution>
+        <execution>
+          <id>check</id>
+          <goals><goal>check</goal></goals>
+          <configuration>
+            <rules>
+              <rule>
+                <element>BUNDLE</element>
+                <limits>
+                  <limit>
+                    <counter>LINE</counter>
+                    <value>COVEREDRATIO</value>
+                    <minimum>0.70</minimum>
+                  </limit>
+                </limits>
+              </rule>
+            </rules>
+          </configuration>
+        </execution>
+      </executions>
+    </plugin>
+  </plugins>
+</build>
+
+
+Os relatórios (target/site/jacoco) também irão como artefato com a etapa de upload.
+
+8) Como validar rapidamente
+
+Faça um commit que mexa em qualquer arquivo de src/** e abra um PR.
+
+Confira a aba Actions no GitHub; o workflow “CI - Maven Tests (Java 21)” deve iniciar.
+
+Em caso de falha, baixe o artefato maven-test-reports para ver detalhes dos testes.
