@@ -2,13 +2,13 @@ name: CI - Maven Tests (Java 21)
 
 on:
   push:
-    branches: [ "**" ]
+    branches-ignore: [ "master" ]
     paths:
       - "pom.xml"
       - "src/**"
       - ".github/workflows/tests.yml"
   pull_request:
-    branches: [ "**" ]
+    branches-ignore: [ "master" ]
     paths:
       - "pom.xml"
       - "src/**"
