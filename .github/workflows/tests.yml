@@ -1,0 +1,61 @@
+name: CI - Maven Tests (Java 21)
+
+on:
+  push:
+    branches: [ "**" ]
+    paths:
+      - "pom.xml"
+      - "src/**"
+      - ".github/workflows/tests.yml"
+  pull_request:
+    branches: [ "**" ]
+    paths:
+      - "pom.xml"
+      - "src/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      MAVEN_OPTS: "-XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xmx2g -Dstyle.color=always"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21 (Temurin) + cache Maven
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Show Java & Maven versions
+        run: |
+          java -version
+          if [ -f ./mvnw ]; then ./mvnw -v; else mvn -v; fi
+
+      - name: Build & run tests (unit + component)
+        run: |
+          if [ -f ./mvnw ]; then MVN=./mvnw; else MVN=mvn; fi
+          $MVN -B -ntp -U clean verify
+
+      # Publica relatórios de testes sempre (útil para debugar falhas no PR)
+      - name: Upload Surefire/Failsafe reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maven-test-reports
+          path: |
+            **/target/surefire-reports/**
+            **/target/failsafe-reports/**
+          if-no-files-found: ignore
