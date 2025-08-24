@@ -241,7 +241,17 @@ jobs:
       - name: Generate coverage report
         run: |
           if [ -f ./mvnw ]; then MVN=./mvnw; else MVN=mvn; fi
-          $MVN -B -ntp -U jacoco:report -Dspring.profiles.active=test-mysql
+          # Executa testes e gera relatório de cobertura
+          $MVN -B -ntp -U clean test -Dspring.profiles.active=test-mysql
+          
+          # Verifica se o relatório foi gerado
+          if [ -f "target/site/jacoco/index.html" ]; then
+            echo "✅ Relatório de cobertura gerado com sucesso!"
+            ls -la target/site/jacoco/
+          else
+            echo "❌ Relatório de cobertura não foi gerado"
+            find target/ -name "*.html" 2>/dev/null || echo "Nenhum arquivo HTML encontrado"
+          fi
 
       - name: Upload coverage reports
         if: always()

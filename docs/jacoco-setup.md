@@ -12,50 +12,58 @@ Adicione o seguinte plugin na seção `<build><plugins>` do seu `pom.xml`:
 <plugin>
   <groupId>org.jacoco</groupId>
   <artifactId>jacoco-maven-plugin</artifactId>
-  <version>0.8.12</version>
+  <version>0.8.11</version>
   <executions>
     <execution>
-      <id>prepare-agent</id>
       <goals>
         <goal>prepare-agent</goal>
       </goals>
     </execution>
     <execution>
       <id>report</id>
-      <phase>verify</phase>
+      <phase>test</phase>
       <goals>
         <goal>report</goal>
       </goals>
-    </execution>
-    <execution>
-      <id>check</id>
-      <goals>
-        <goal>check</goal>
-      </goals>
-      <configuration>
-        <rules>
-          <rule>
-            <element>BUNDLE</element>
-            <limits>
-              <limit>
-                <counter>LINE</counter>
-                <value>COVEREDRATIO</value>
-                <minimum>0.70</minimum>
-              </limit>
-            </limits>
-          </rule>
-        </rules>
-      </configuration>
     </execution>
   </executions>
 </plugin>
 ```
 
+**Nota**: Esta é uma configuração básica que gera relatórios automaticamente após os testes. Para thresholds de cobertura, veja a seção "Configurações Avançadas" abaixo.
+
 ## O que cada execução faz
 
 1. **prepare-agent**: Prepara o agente JaCoCo para coletar dados de cobertura
-2. **report**: Gera o relatório HTML de cobertura
-3. **check**: Verifica se a cobertura está acima do mínimo (70% neste exemplo)
+2. **report**: Gera o relatório HTML de cobertura automaticamente após os testes
+
+## Configurações Avançadas
+
+### Threshold de Cobertura (Opcional)
+Para verificar se a cobertura está acima de um mínimo, adicione esta execução:
+
+```xml
+<execution>
+  <id>check</id>
+  <goals>
+    <goal>check</goal>
+  </goals>
+  <configuration>
+    <rules>
+      <rule>
+        <element>BUNDLE</element>
+        <limits>
+          <limit>
+            <counter>LINE</counter>
+            <value>COVEREDRATIO</value>
+            <minimum>0.70</minimum>
+          </limit>
+        </limits>
+      </rule>
+    </rules>
+  </configuration>
+</execution>
+```
 
 ## Configurações Personalizáveis
 
@@ -86,14 +94,17 @@ Você pode configurar diferentes tipos de cobertura:
 Para testar a cobertura localmente:
 
 ```bash
-# Gerar relatório de cobertura
-./mvnw jacoco:report
-
-# Verificar se atende aos thresholds
-./mvnw jacoco:check
+# Executar testes e gerar relatório de cobertura
+./mvnw clean test
 
 # Build completo com cobertura
 ./mvnw clean verify
+
+# Apenas gerar relatório (se testes já foram executados)
+./mvnw jacoco:report
+
+# Verificar thresholds (se configurado)
+./mvnw jacoco:check
 ```
 
 ## Relatórios Gerados

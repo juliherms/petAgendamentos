@@ -67,7 +67,7 @@ mv .github/workflows/tests-advanced.yml .github/workflows/tests.yml
 - Spring Boot 3.5.5
 
 ### ⚙️ Opcional (Para workflow avançado)
-- Plugin JaCoCo para cobertura
+- ✅ **Plugin JaCoCo para cobertura** - Já configurado no `pom.xml`
 - Separação de testes unitários vs integração
 - Cache otimizado do Maven
 
@@ -79,8 +79,11 @@ Para testar localmente o que o CI fará:
 # Testes básicos
 ./mvnw clean verify
 
-# Com cobertura (se JaCoCo configurado)
-./mvnw clean verify jacoco:report
+# Com cobertura (JaCoCo já configurado)
+./mvnw clean test
+
+# Ver relatório de cobertura
+open target/site/jacoco/index.html
 
 # Apenas testes unitários
 ./mvnw clean test
