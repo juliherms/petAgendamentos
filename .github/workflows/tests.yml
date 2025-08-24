@@ -47,10 +47,22 @@ jobs:
           java -version
           if [ -f ./mvnw ]; then ./mvnw -v; else mvn -v; fi
 
+      - name: Start MySQL with Docker Compose
+        run: |
+          docker-compose up -d mysql
+          # Aguarda MySQL estar pronto
+          timeout 60 bash -c 'until docker exec pets-mysql mysqladmin ping -h"localhost" -u"pets_user" -p"pets_pass" --silent; do sleep 2; done'
+          echo "MySQL is ready!"
+
+      - name: Show MySQL status
+        run: |
+          docker-compose ps
+          docker exec pets-mysql mysql -u pets_user -ppets_pass -e "SHOW DATABASES;"
+
       - name: Build & run tests (unit + component)
         run: |
           if [ -f ./mvnw ]; then MVN=./mvnw; else MVN=mvn; fi
-          $MVN -B -ntp -U clean verify
+          $MVN -B -ntp -U clean verify -Dspring.profiles.active=test-mysql
 
       # Publica relatórios de testes sempre (útil para debugar falhas no PR)
       - name: Upload Surefire/Failsafe reports

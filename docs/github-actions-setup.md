@@ -30,9 +30,10 @@ O workflow está localizado em `.github/workflows/tests.yml` e executa:
 - Usa Spring Boot 3.5.5 (compatível com Java 21)
 
 ### Banco de Teste
-- Usa H2 em memória para testes
-- Configurado em `src/main/resources/application-test.properties`
-- Perfil de teste ativado automaticamente pelo Spring Boot
+- **MySQL via Docker Compose**: Para testes de integração e CI/CD
+- **H2 em memória**: Para testes unitários locais
+- **Perfil MySQL**: `application-test-mysql.properties` para CI/CD
+- **Perfil H2**: `application-test.properties` para testes locais
 
 ### Maven Wrapper
 - Projeto já possui `mvnw` e `mvnw.cmd`
@@ -52,6 +53,11 @@ Para verificar se está funcionando:
 ### Falha nos Testes
 - Baixe o artefato "maven-test-reports" para ver detalhes
 - Verifique os logs do workflow para erros de compilação
+
+### Erro de Permissão do Maven Wrapper
+- **Sintoma**: `./mvnw: Permission denied`
+- **Solução**: O workflow já inclui `chmod +x ./mvnw` para corrigir permissões
+- **Causa**: Arquivos do Git não preservam permissões de execução no Windows
 
 ### Timeout
 - O workflow tem timeout de 20 minutos
@@ -78,8 +84,10 @@ Para verificar se está funcionando:
 - Configurar `-DskipITs` para pular em PRs se necessário
 
 ### Serviços Externos
-- Adicionar `services` no workflow para PostgreSQL, Redis, etc.
-- Útil se os testes precisarem de infraestrutura real
+- **MySQL via Docker Compose**: ✅ Já configurado nos workflows
+- **Configuração**: Usa `docker-compose.yml` do projeto
+- **Perfil**: `test-mysql` para testes com banco real
+- **Outros**: Pode adicionar PostgreSQL, Redis, etc. conforme necessário
 
 ## Comandos Locais
 

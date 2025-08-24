@@ -13,6 +13,7 @@ Este projeto agora possui **GitHub Actions** configurados para executar testes a
 ### 2. Documentação
 - **`docs/github-actions-setup.md`** - Guia completo de configuração
 - **`docs/jacoco-setup.md`** - Configuração do JaCoCo para cobertura
+- **`docs/docker-compose-setup.md`** - Configuração do MySQL via Docker Compose
 - **`README-GITHUB-ACTIONS.md`** - Este arquivo de resumo
 
 ## 🎯 Workflows Disponíveis
@@ -61,7 +62,8 @@ mv .github/workflows/tests-advanced.yml .github/workflows/tests.yml
 ### ✅ Já Configurado
 - Java 21 no `pom.xml`
 - Maven Wrapper (`mvnw`, `mvnw.cmd`)
-- H2 para testes em memória
+- **MySQL via Docker Compose** para CI/CD
+- H2 para testes em memória (local)
 - Spring Boot 3.5.5
 
 ### ⚙️ Opcional (Para workflow avançado)
@@ -111,6 +113,11 @@ Para testar localmente o que o CI fará:
 - Baixe o artefato "maven-test-reports"
 - Execute `./mvnw clean verify` localmente
 - Verifique logs do workflow
+
+### Erro de Permissão do Maven Wrapper
+- **Sintoma**: `./mvnw: Permission denied` no GitHub Actions
+- **Solução**: ✅ Já corrigido nos workflows com `chmod +x ./mvnw`
+- **Causa**: Arquivos do Git no Windows não preservam permissões de execução
 
 ### Timeout
 - Aumente `timeout-minutes` no YAML
