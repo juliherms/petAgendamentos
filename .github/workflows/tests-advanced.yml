@@ -2,13 +2,13 @@ name: CI - Advanced Maven Tests (Java 21)
 
 on:
   push:
-    branches: [ "**" ]
+    branches: [ "master" ]
     paths:
       - "pom.xml"
       - "src/**"
       - ".github/workflows/**"
   pull_request:
-    branches: [ "**" ]
+    branches: [ "master" ]
     paths:
       - "pom.xml"
       - "src/**"
@@ -104,7 +104,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: unit-tests
-    if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
+    if: github.ref == 'refs/heads/master' || github.event_name == 'pull_request'
     strategy:
       matrix:
         java: ['21']
@@ -180,7 +180,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [unit-tests, integration-tests]
-    if: always() && (github.ref == 'refs/heads/main' || github.event_name == 'pull_request')
+    if: always() && (github.ref == 'refs/heads/master' || github.event_name == 'pull_request')
     strategy:
       matrix:
         java: ['21']
