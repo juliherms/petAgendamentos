@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificação de Conta - Pets API</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 300;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .token-box {
+            background-color: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 25px;
+            margin: 30px 0;
+            text-align: center;
+        }
+        .token-code {
+            font-size: 32px;
+            font-weight: bold;
+            color: #007bff;
+            letter-spacing: 3px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+        }
+        .expiry-info {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            color: #856404;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px 30px;
+            text-align: center;
+            border-top: 1px solid #dee2e6;
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .warning {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            color: #721c24;
+        }
+        .btn {
+            display: inline-block;
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: 500;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        @media only screen and (max-width: 600px) {
+            .container {
+                margin: 10px;
+                border-radius: 0;
+            }
+            .content {
+                padding: 20px 15px;
+            }
+            .header {
+                padding: 20px 15px;
+            }
+            .token-code {
+                font-size: 24px;
+                letter-spacing: 2px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 th:text="${appName}">Pets API</h1>
+            <p>Verificação de Conta</p>
+        </div>
+        
+        <div class="content">
+            <h2>Olá!</h2>
+            <p>Você solicitou a verificação da sua conta na <strong th:text="${appName}">Pets API</strong>.</p>
+            
+            <div class="token-box">
+                <h3>Seu código de verificação:</h3>
+                <div class="token-code" th:text="${token}">123456</div>
+                <p>Use este código para ativar sua conta</p>
+            </div>
+            
+            <div class="expiry-info">
+                <strong>⚠️ Importante:</strong> Este código expira em <span th:text="${horasRestantes}">24</span> horas.
+            </div>
+            
+            <div class="warning">
+                <strong>🔒 Segurança:</strong> Nunca compartilhe este código com outras pessoas. 
+                Nossa equipe nunca solicitará este código por telefone, e-mail ou mensagem.
+            </div>
+            
+            <p>Se você não solicitou esta verificação, ignore este e-mail com segurança.</p>
+            
+            <p>Em caso de dúvidas, entre em contato com nosso suporte.</p>
+        </div>
+        
+        <div class="footer">
+            <p><strong>Atenciosamente,</strong><br>
+            Equipe <span th:text="${appName}">Pets API</span></p>
+            <p style="margin-top: 15px; font-size: 12px; color: #999;">
+                Este é um e-mail automático, não responda a esta mensagem.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

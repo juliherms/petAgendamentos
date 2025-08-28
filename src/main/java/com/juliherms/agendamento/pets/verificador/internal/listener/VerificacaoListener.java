@@ -7,6 +7,7 @@ import com.juliherms.agendamento.pets.verificador.internal.service.EmailService;
 import com.juliherms.agendamento.pets.verificador.internal.service.SMSService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -23,7 +24,7 @@ public class VerificacaoListener {
     private final EmailService emailService;
     private final SMSService smsService;
 
-    public VerificacaoListener(EmailService emailService, SMSService smsService) {
+    public VerificacaoListener(@Qualifier("emailServiceMailTrap") EmailService emailService, SMSService smsService) {
         this.emailService = emailService;
         this.smsService = smsService;
     }
