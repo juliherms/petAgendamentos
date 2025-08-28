@@ -47,15 +47,15 @@ public class UserService {
     private String gerarTokenValidacao() {
         StringBuilder token = new StringBuilder();
         String caracteres = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-
+        
         // Gera um token com comprimento entre 4 e 6 caracteres
         int comprimento = secureRandom.nextInt(3) + 4; // 4, 5 ou 6 caracteres
-
+        
         for (int i = 0; i < comprimento; i++) {
             int indice = secureRandom.nextInt(caracteres.length());
             token.append(caracteres.charAt(indice));
         }
-
+      
         return token.toString();
     }
 
