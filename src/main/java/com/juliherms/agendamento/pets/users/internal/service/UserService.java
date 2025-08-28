@@ -148,7 +148,7 @@ public class UserService {
         VerificationToken token = opt.orElseThrow(() -> new UsersExceptionHandler.TokenInvalidoException("token inválido ou expirado"));
 
         // Verifica se o token fornecido corresponde ao token armazenado
-        if (!BCrypt.checkpw(req.token(), token.getTokenHash())) {
+        if (!req.token().equalsIgnoreCase(token.getTokenHash())) {
             throw new UsersExceptionHandler.TokenInvalidoException("token inválido ou expirado");
         }
 
