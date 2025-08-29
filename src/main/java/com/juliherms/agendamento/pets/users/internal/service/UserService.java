@@ -55,7 +55,7 @@ public class UserService {
             int indice = secureRandom.nextInt(caracteres.length());
             token.append(caracteres.charAt(indice));
         }
-        
+      
         return token.toString();
     }
 
@@ -141,14 +141,14 @@ public class UserService {
         // Verifica se o canal de verificação é válido
         Optional<VerificationToken> opt =
                 tokenRepository.findTopByIdUsuarioAndCanalAndUtilizadoIsFalseAndExpiresAtAfterOrderByExpiresAtDesc(
-                user.getId(), req.canal(), Instant.now()
-        );
+                        user.getId(), req.canal(), Instant.now()
+                );
 
         // Se não encontrar um token válido, lança uma exceção
         VerificationToken token = opt.orElseThrow(() -> new UsersExceptionHandler.TokenInvalidoException("token inválido ou expirado"));
 
         // Verifica se o token fornecido corresponde ao token armazenado
-        if (!BCrypt.checkpw(req.token(), token.getTokenHash())) {
+        if (!req.token().equalsIgnoreCase(token.getTokenHash())) {
             throw new UsersExceptionHandler.TokenInvalidoException("token inválido ou expirado");
         }
 
@@ -176,5 +176,3 @@ public class UserService {
         );
     }
 }
-
-

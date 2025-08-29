@@ -1,0 +1,281 @@
+1) Visão geral de arquitetura
+
+Objetivo dev/teste: capturar e-mails em um inbox sandbox (Mailtrap Sandbox), sem entregar de fato.
+
+Objetivo stage/prod: usar o Mailtrap Email Sending (ou outro provedor) com domínio verificado, DKIM/SPF.
+
+Princípios: 12-factor (credenciais por env), idempotência do envio, observabilidade (métricas/logs), backoff em falhas temporárias e timeout bem definidos.
+
+2) Dependências
+
+Maven
+
+<dependencies>
+  <!-- SMTP via Jakarta Mail -->
+  <dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-mail</artifactId>
+  </dependency>
+
+  <!-- (Opcional) templates HTML -->
+  <dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-thymeleaf</artifactId>
+  </dependency>
+
+  <!-- (Opcional) actuator para healthchecks -->
+  <dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-actuator</artifactId>
+  </dependency>
+</dependencies>
+
+
+Spring Boot 3 usa jakarta.mail sob o capô; não misture com javax.mail.
+
+3) Provisionamento no Mailtrap
+
+Crie/acesse sua conta.
+
+Em Sandbox, crie um Inbox.
+
+Copie as credenciais SMTP (host, port, username, password) do próprio Inbox.
+
+⚠️ Os valores (host/port) podem variar; use exatamente os exibidos no Mailtrap para o seu Inbox.
+
+(Para Sending) verifique o domínio e obtenha as credenciais SMTP específicas de envio real (e configure SPF/DKIM conforme instruções da plataforma).
+
+4) Configuração por ambiente
+
+application.yml (valores de dev usando variáveis de ambiente; não faça commit de segredos)
+
+spring:
+  profiles:
+    group:
+      dev: dev
+      prod: prod
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  mail:
+    host: ${MAILTRAP_HOST}         # ex.: sandbox.smtp.mailtrap.io (use o que a UI mostrar)
+    port: ${MAILTRAP_PORT:2525}    # porta típica; confirme na UI
+    username: ${MAILTRAP_USER}
+    password: ${MAILTRAP_PASS}
+    protocol: smtp
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000   # ms
+          timeout: 5000
+          writetimeout: 5000
+    default-encoding: UTF-8
+
+
+application-prod.yml (exemplo com Mailtrap Sending ou outro provedor)
+
+spring:
+  mail:
+    host: ${SMTP_HOST}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USER}
+    password: ${SMTP_PASS}
+    protocol: smtp
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+    default-encoding: UTF-8
+
+
+🚩 Dica: deixe from configurável também (por domínio verificado em prod).
+
+5) Serviço de envio (texto simples, HTML e anexos)
+package com.example.mail;
+
+import jakarta.mail.internet.MimeMessage;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.mail.MailAuthenticationException;
+import org.springframework.mail.MailSendException;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.stereotype.Service;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
+
+@Service
+public class EmailService {
+
+  private final JavaMailSender mailSender;
+
+  public EmailService(JavaMailSender mailSender) {
+    this.mailSender = mailSender;
+  }
+
+  // Texto simples
+  public void sendText(String from, String to, String subject, String body) {
+    SimpleMailMessage msg = new SimpleMailMessage();
+    msg.setFrom(from);
+    msg.setTo(to);
+    msg.setSubject(subject);
+    msg.setText(body);
+    try {
+      mailSender.send(msg);
+    } catch (MailAuthenticationException | MailSendException ex) {
+      // logar/metricar e rethrow se necessário
+      throw ex;
+    }
+  }
+
+  // HTML + anexos
+  public void sendHtml(String from, String to, String subject, String html, Map<String, byte[]> attachments) throws Exception {
+    MimeMessage mime = mailSender.createMimeMessage();
+    MimeMessageHelper helper = new MimeMessageHelper(mime, true, StandardCharsets.UTF_8.name());
+    helper.setFrom(from);
+    helper.setTo(to);
+    helper.setSubject(subject);
+    helper.setText(html, true);
+    if (attachments != null) {
+      for (var entry : attachments.entrySet()) {
+        helper.addAttachment(entry.getKey(), new ByteArrayResource(entry.getValue()));
+      }
+    }
+    mailSender.send(mime);
+  }
+}
+
+6) (Opcional) Templates com Thymeleaf
+
+src/main/resources/templates/email/boas-vindas.html
+
+<!doctype html>
+<html>
+  <body>
+    <h3>Olá, [[${nome}]]!</h3>
+    <p>Seu cadastro foi criado com sucesso.</p>
+  </body>
+</html>
+
+
+Serviço para processar template
+
+package com.example.mail;
+
+import org.springframework.stereotype.Service;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
+
+import java.util.Map;
+
+@Service
+public class TemplateRenderer {
+  private final TemplateEngine templateEngine;
+  public TemplateRenderer(TemplateEngine templateEngine) {
+    this.templateEngine = templateEngine;
+  }
+  public String render(String template, Map<String, Object> model) {
+    Context ctx = new Context();
+    model.forEach(ctx::setVariable);
+    return templateEngine.process(template, ctx);
+  }
+}
+
+
+Uso
+
+String html = templateRenderer.render("email/boas-vindas", Map.of("nome", "Juliherms"));
+emailService.sendHtml(fromAddr, "destino@exemplo.com", "Bem-vindo!", html, null);
+
+7) Endpoint de teste (somente dev)
+package com.example.mail;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/emails")
+public class EmailController {
+
+  private final EmailService emailService;
+
+  @Value("${app.mail.from:no-reply@exemplo.dev}")
+  private String from;
+
+  public EmailController(EmailService emailService) {
+    this.emailService = emailService;
+  }
+
+  @PostMapping("/test")
+  public ResponseEntity<?> sendTest(@RequestParam String to) {
+    emailService.sendText(from, to, "Teste Mailtrap", "Olá! Este é um teste.");
+    return ResponseEntity.ok().build();
+  }
+}
+
+
+Em dev, chame: POST /emails/test?to=seu-alias@mailtrap.io (o to pode ser qualquer endereço; o Mailtrap Sandbox intercepta).
+
+8) Observabilidade e healthcheck
+
+Conexão SMTP: você pode testar na subida da aplicação:
+
+// Em um @Component @PostConstruct OU via um HealthIndicator custom
+// ((JavaMailSenderImpl) mailSender).testConnection();
+
+
+Logging: logue tentativas/falhas e tempos (para latência).
+
+Métricas: publique contadores (enviado, falha permanente, falha transitória, retry).
+
+Retry/backoff: se encaixa bem com @Retryable (spring-retry) para códigos 4xx/5xx transitórios.
+
+9) Segurança e boas práticas
+
+Credenciais só via variáveis de ambiente/secret manager.
+
+Não “fixe” from em domínios não verificados em prod (SPF/DKIM/DMARC).
+
+Defina timeouts (conexão/leitura/escrita) para não travar threads.
+
+Trate MailSendException com granularidade (endereços inválidos vs. falhas de transporte).
+
+10) Problemas comuns (e correções)
+
+TLS/porta errada → Use a porta exibida na UI do Mailtrap e mantenha starttls.enable=true.
+
+Falha de autenticação → confira username/password do Inbox correto.
+
+Caracteres acentuados quebrados → default-encoding=UTF-8 e MimeMessageHelper(..., "UTF-8").
+
+Bloqueio por firewall corporativo → libere saída para host/porta SMTP do Mailtrap.
+
+11) Validação final (checklist)
+
+Variáveis definidas: MAILTRAP_HOST, MAILTRAP_PORT, MAILTRAP_USER, MAILTRAP_PASS, SPRING_PROFILES_ACTIVE=dev.
+
+Teste de conexão: testConnection() não lança exceção na inicialização.
+
+Envio texto: chamar POST /emails/test?to=qualquer@exemplo.com → mensagem aparece no Inbox Sandbox do Mailtrap.
+
+Envio HTML: renderizar template e verificar no Mailtrap se chegou como HTML (visualize “HTML”/“Text”).
+
+Anexos: enviar um PDF e conferir no Mailtrap.
+
+Logs/metrics: ver contadores e tempos no APM/Actuator (/actuator/health, /actuator/metrics se expostos).
+
+Prod (se aplicável): domínio verificado, SPF/DKIM ok, testes de entrega real com caixa de e-mail de homologação.
+
+Conclusão
+
+Com esse fluxo, você separa Sandbox (seguro p/ dev) de Sending (real p/ stage/prod), parametriza tudo via spring.mail.*, possui serviço de envio robusto (texto/HTML/anexo), templates com Thymeleaf, healthcheck e checklist de validação. Isso garante integração consistente com o Mailtrap e reduz surpresas na promoção para produção.
