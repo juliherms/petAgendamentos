@@ -9,6 +9,7 @@ API modular (Spring Boot + Spring Modulith) para cadastro de usuários, pets e s
   - `services`: cadastro de serviços (perfil PROVEDOR) com preços por porte.
   - `verificador`: processa eventos de criação e envia verificação via e-mail ou SMS (simulado).
   - `notifications`: módulo para futuras implementações de notificações.
+  - **`agendamento`: agendamento de serviços para pets com validação de horário comercial e disponibilidade.**
 - Segurança de dados: senha com hash BCrypt; token de verificação armazenado como hash (uso único, TTL 24h).
 - Banco: MySQL 8.0 com configurações específicas por ambiente (dev/prod).
 - **E-mail**: Sistema de envio com implementações simulada e real (Mailtrap), templates Thymeleaf, configuração por ambiente.
@@ -120,6 +121,22 @@ Observação: após criar o usuário, o módulo `verificador` processa automatic
       "ativo": true
     }
     ```
+
+### Agendamentos
+- POST `/agendamentos` — cria agendamento de serviço para pet (slot de 1h).
+  - Request (exemplo):
+    ```json
+    {
+      "petId": 1,
+      "servicoId": 1,
+      "prestadorId": 2,
+      "data": "2025-01-15",
+      "horaInicio": "10:00"
+    }
+    ```
+  - Validações: horário comercial (09:00-18:00), dias úteis (seg-sáb), hora cheia, disponibilidade.
+- GET `/agendamentos/usuario/{usuarioId}` — lista agendamentos do usuário.
+- GET `/agendamentos/pet/{petId}` — lista agendamentos de um pet específico.
 
 ### E-mails (Desenvolvimento)
 - GET `/emails/info` — informações sobre o serviço de e-mail ativo

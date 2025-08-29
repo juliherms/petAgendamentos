@@ -1,0 +1,111 @@
+História de Usuário — Agendar Serviço para Pet (slot de 1h)
+
+Como tutor de pet
+Quero agendar um serviço (ex.: banho, tosa) informando data e hora
+Para garantir atendimento no horário comercial, sem conflitos com outros agendamentos
+
+Contexto e Premissas
+
+Janela de atendimento: segunda a sábado, horário comercial (assumir 09:00–18:00 como padrão; deve ser configurável).
+
+Duração fixa do serviço: 1 hora por agendamento.
+
+Não pode haver dois pets agendados no mesmo horário para o mesmo prestador (ou mesma baia/estação de serviço).
+
+Início do agendamento deve estar alinhado à hora cheia (ex.: 09:00, 10:00…).
+
+Fuso padrão do sistema: America/Recife (configurável).
+
+Datas passadas não podem ser agendadas.
+
+Regras de Negócio
+
+Disponibilidade: permitir apenas horários dentro de [início_comercial, fim_comercial) em seg–sáb.
+
+Slot fixo: cada agendamento ocupa exatamente 1h a partir do horário escolhido.
+
+Exclusividade: rejeitar agendamento se já existir outro para o mesmo prestador (ou recurso) com mesmo horário de início.
+
+Alinhamento: só aceitar horários no formato HH:00.
+
+Integridade: tutor deve possuir pet válido; serviço e prestador devem estar ativos.
+
+Zona de tempo: validações de data/hora feitas no fuso do estabelecimento (padrão America/Recife).
+
+Cancelamento/Reagendamento (futuro): manter trilha para liberar slot.
+
+Campos mínimos (request)
+
+petId (long)
+
+servicoId (long)
+
+prestadorId (long)
+
+data (ISO YYYY-MM-DD)
+
+horaInicio (ISO HH:mm, alinhado à hora cheia; ex.: 14:00)
+
+Critérios de Aceite (Gherkin)
+Funcionalidade: Agendamento de serviço para pet (slot de 1h)
+
+Cenário: Agendar com sucesso dentro do horário comercial em dia útil (seg–sáb)
+  Dado que existe um prestador ativo com disponibilidade padrão 09:00–18:00
+  E não há agendamento para o prestador às 10:00 na data 2025-09-02
+  Quando solicito agendar o serviço "banho" para o pet "Thor" às 10:00 em 2025-09-02
+  Então o sistema cria o agendamento das 10:00 às 11:00
+  E retorna status 201 com o identificador do agendamento
+
+Cenário: Rejeitar agendamento fora do horário comercial (antes da abertura)
+  Dado horário comercial 09:00–18:00
+  Quando tento agendar às 08:00 em 2025-09-03
+  Então o sistema rejeita com erro "fora do horário comercial" (HTTP 422)
+
+Cenário: Rejeitar agendamento após o horário comercial (fim_exclusivo)
+  Dado horário comercial 09:00–18:00
+  Quando tento agendar às 18:00 em 2025-09-03
+  Então o sistema rejeita com erro "fora do horário comercial" (HTTP 422)
+
+Cenário: Rejeitar agendamento no domingo
+  Dado que o domingo é dia não atendido
+  Quando tento agendar no domingo 2025-09-07 às 11:00
+  Então o sistema rejeita com erro "dia indisponível" (HTTP 422)
+
+Cenário: Impedir conflito para o mesmo prestador
+  Dado que já existe agendamento para o prestador X às 15:00 em 2025-09-04
+  Quando tento agendar outro pet às 15:00 com o mesmo prestador X na mesma data
+  Então o sistema rejeita com erro "horário indisponível" (HTTP 409)
+
+Cenário: Rejeitar horário não alinhado (minutos diferentes de 00)
+  Quando tento agendar às 10:30 em 2025-09-05
+  Então o sistema rejeita com erro "horário inválido; use horas cheias" (HTTP 422)
+
+Cenário: Rejeitar data/hora no passado
+  Dado o horário atual 2025-08-28 10:00 America/Recife
+  Quando tento agendar para 2025-08-28 às 09:00
+  Então o sistema rejeita com erro "data/hora no passado" (HTTP 422)
+
+Definição de Pronto (DoD)
+
+Regras acima implementadas com testes unitários e de integração cobrindo todos os cenários.
+
+Endpoint/documentação atualizados (OpenAPI), com mensagens de erro claras.
+
+Validações de fuso-horário e alinhamento a hora cheia.
+
+Bloqueio transacional/índice único para (prestadorId, data, horaInicio) evitando race condition.
+
+Logs de auditoria de criação/erro de agendamento.
+
+Observações Técnicas (sugestão)
+
+Modelagem: Agendamento(id, petId, servicoId, prestadorId, inicio, fim)
+Índice único: (prestadorId, inicio)
+
+Validação de horário: horaInicio.minute == 0 e inicio >= abertura e fim <= fechamento, com fim = inicio + 1h.
+
+Concorrência: usar transação + unique constraint para garantir exclusividade sob carga.
+
+Config: horário comercial e dias atendidos em tabela de configuração ou application.yml.
+
+Se quiser, eu já te entrego um esqueleto de endpoint (Spring Boot) e o script SQL do índice único.

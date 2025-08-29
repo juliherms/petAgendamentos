@@ -188,3 +188,4 @@ public class EmailServiceMailTrapImpl implements EmailService {
             """, token, horasRestantes);
     }
 }
+

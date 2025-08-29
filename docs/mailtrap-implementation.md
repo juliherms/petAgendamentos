@@ -260,3 +260,4 @@ export MAILTRAP_FROM=no-reply@pets.dev
 - Habilite logs DEBUG para `org.springframework.mail`
 - Verifique configurações SMTP no log de inicialização
 - Use endpoints de teste para validar funcionalidade
+
