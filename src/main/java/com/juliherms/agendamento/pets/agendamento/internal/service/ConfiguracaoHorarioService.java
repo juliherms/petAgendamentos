@@ -102,3 +102,4 @@ public class ConfiguracaoHorarioService implements CommandLineRunner {
         return configuracaoHorarioRepository.existsByDiaSemanaAndAtivoTrue(diaSemana);
     }
 }
+

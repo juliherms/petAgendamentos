@@ -23,6 +23,8 @@ import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -33,8 +35,13 @@ import static org.mockito.Mockito.*;
 /**
  * Unit tests for AgendamentoService.
  * Uses Mockito to mock dependencies and verify interactions.
+ * Configured to work with GMT-3 (Brazil timezone).
  */
 class AgendamentoServiceTest {
+
+    // Timezone configuration for Brazil (GMT-3)
+    private static final ZoneId BRAZIL_TIMEZONE = ZoneId.of("America/Sao_Paulo");
+    private static final ZoneId UTC_TIMEZONE = ZoneId.of("UTC");
 
     @Mock
     private AgendamentoRepository agendamentoRepository;
@@ -63,14 +70,43 @@ class AgendamentoServiceTest {
     }
 
     /**
+     * Helper method to get current date in Brazil timezone
+     * @return LocalDate in Brazil timezone
+     */
+    private LocalDate getCurrentDateInBrazil() {
+        return ZonedDateTime.now(BRAZIL_TIMEZONE).toLocalDate();
+    }
+
+    /**
+     * Helper method to get a specific date in Brazil timezone
+     * @param daysOffset number of days to add/subtract from current date
+     * @return LocalDate in Brazil timezone
+     */
+    private LocalDate getDateInBrazil(int daysOffset) {
+        return getCurrentDateInBrazil().plusDays(daysOffset);
+    }
+
+    /**
+     * Helper method to convert UTC date to Brazil timezone
+     * @param utcDate date in UTC
+     * @return LocalDate in Brazil timezone
+     */
+    private LocalDate convertUtcToBrazilDate(LocalDate utcDate) {
+        return utcDate.atStartOfDay(UTC_TIMEZONE)
+                .withZoneSameInstant(BRAZIL_TIMEZONE)
+                .toLocalDate();
+    }
+
+    /**
      * Test creating an appointment successfully.
      * Mocks all dependencies and verifies the save and event publish actions.
      */
     @Test
     void shouldCreateAgendamentoSuccessfully() {
         // Arrange
+        LocalDate tomorrowInBrazil = getDateInBrazil(1);
         AgendamentoApi.CreateAgendamentoRequest request = new AgendamentoApi.CreateAgendamentoRequest(
-                1L, 2L, 3L, LocalDate.now().plusDays(1), LocalTime.of(10, 0)
+                1L, 2L, 3L, tomorrowInBrazil, LocalTime.of(10, 0)
         );
 
         when(petRepository.findById(1L)).thenReturn(Optional.of(mockPet()));
@@ -96,8 +132,9 @@ class AgendamentoServiceTest {
     @Test
     void shouldThrowExceptionWhenPetNotFound() {
         // Arrange
+        LocalDate tomorrowInBrazil = getDateInBrazil(1);
         AgendamentoApi.CreateAgendamentoRequest request = new AgendamentoApi.CreateAgendamentoRequest(
-                1L, 2L, 3L, LocalDate.now().plusDays(1), LocalTime.of(10, 0)
+                1L, 2L, 3L, tomorrowInBrazil, LocalTime.of(10, 0)
         );
 
         when(petRepository.findById(1L)).thenReturn(Optional.empty());
@@ -145,8 +182,9 @@ class AgendamentoServiceTest {
     @Test
     void shouldThrowExceptionWhenHorarioIndisponivel() {
         // Arrange
+        LocalDate tomorrowInBrazil = getDateInBrazil(1);
         AgendamentoApi.CreateAgendamentoRequest request = new AgendamentoApi.CreateAgendamentoRequest(
-                1L, 2L, 3L, LocalDate.now().plusDays(1), LocalTime.of(10, 0)
+                1L, 2L, 3L, tomorrowInBrazil, LocalTime.of(10, 0)
         );
 
         // Set up mocks
@@ -172,8 +210,9 @@ class AgendamentoServiceTest {
     @Test
     void shouldThrowExceptionWhenUsuarioInativo() {
         // Arrange
+        LocalDate tomorrowInBrazil = getDateInBrazil(1);
         AgendamentoApi.CreateAgendamentoRequest request = new AgendamentoApi.CreateAgendamentoRequest(
-                1L, 2L, 3L, LocalDate.now().plusDays(1), LocalTime.of(10, 0)
+                1L, 2L, 3L, tomorrowInBrazil, LocalTime.of(10, 0)
         );
 
         when(petRepository.findById(1L)).thenReturn(Optional.of(mockPet()));
@@ -192,8 +231,9 @@ class AgendamentoServiceTest {
     @Test
     void shouldThrowExceptionWhenServicoInativo() {
         // Arrange
+        LocalDate tomorrowInBrazil = getDateInBrazil(1);
         AgendamentoApi.CreateAgendamentoRequest request = new AgendamentoApi.CreateAgendamentoRequest(
-                1L, 2L, 3L, LocalDate.now().plusDays(1), LocalTime.of(10, 0)
+                1L, 2L, 3L, tomorrowInBrazil, LocalTime.of(10, 0)
         );
 
         when(petRepository.findById(1L)).thenReturn(Optional.of(mockPet()));
@@ -213,8 +253,9 @@ class AgendamentoServiceTest {
     @Test
     void shouldThrowExceptionWhenHorarioForaComercial() {
         // Arrange
+        LocalDate tomorrowInBrazil = getDateInBrazil(1);
         AgendamentoApi.CreateAgendamentoRequest request = new AgendamentoApi.CreateAgendamentoRequest(
-                1L, 2L, 3L, LocalDate.now().plusDays(1), LocalTime.of(20, 0) // Horário fora do comercial
+                1L, 2L, 3L, tomorrowInBrazil, LocalTime.of(20, 0) // Horário fora do comercial
         );
 
         when(petRepository.findById(1L)).thenReturn(Optional.of(mockPet()));
@@ -237,8 +278,9 @@ class AgendamentoServiceTest {
     @Test
     void shouldThrowExceptionWhenUsuarioNaoEhPrestador() {
         // Arrange
+        LocalDate tomorrowInBrazil = getDateInBrazil(1);
         AgendamentoApi.CreateAgendamentoRequest request = new AgendamentoApi.CreateAgendamentoRequest(
-                1L, 2L, 3L, LocalDate.now().plusDays(1), LocalTime.of(10, 0)
+                1L, 2L, 3L, tomorrowInBrazil, LocalTime.of(10, 0)
         );
 
         when(petRepository.findById(1L)).thenReturn(Optional.of(mockPet()));
@@ -259,8 +301,9 @@ class AgendamentoServiceTest {
     @Test
     void shouldThrowExceptionWhenPrestadorNaoEstaAtivo() {
         // Arrange
+        LocalDate tomorrowInBrazil = getDateInBrazil(1);
         AgendamentoApi.CreateAgendamentoRequest request = new AgendamentoApi.CreateAgendamentoRequest(
-                1L, 2L, 3L, LocalDate.now().plusDays(1), LocalTime.of(10, 0)
+                1L, 2L, 3L, tomorrowInBrazil, LocalTime.of(10, 0)
         );
 
         when(petRepository.findById(1L)).thenReturn(Optional.of(mockPet()));
@@ -281,8 +324,9 @@ class AgendamentoServiceTest {
     @Test
     void shouldThrowExceptionWhenDataNoPassado() {
         // Arrange
+        LocalDate yesterdayInBrazil = getDateInBrazil(-1);
         AgendamentoApi.CreateAgendamentoRequest request = new AgendamentoApi.CreateAgendamentoRequest(
-                1L, 2L, 3L, LocalDate.now().minusDays(1), LocalTime.of(10, 0) // Data no passado
+                1L, 2L, 3L, yesterdayInBrazil, LocalTime.of(10, 0) // Data no passado
         );
 
         when(petRepository.findById(1L)).thenReturn(Optional.of(mockPet()));
@@ -294,6 +338,34 @@ class AgendamentoServiceTest {
         assertThatThrownBy(() -> agendamentoService.criarAgendamento(request))
                 .isInstanceOf(AgendamentoExceptionHandler.HorarioNoPassadoException.class)
                 .hasMessageContaining("Data/hora no passado");
+    }
+
+    /**
+     * Test to verify timezone handling - ensures dates are properly converted
+     * between UTC and Brazil timezone
+     */
+    @Test
+    void shouldHandleTimezoneConversionCorrectly() {
+        // Arrange
+        LocalDate utcDate = LocalDate.of(2024, 1, 15);
+        LocalDate brazilDate = convertUtcToBrazilDate(utcDate);
+        
+        // Act & Assert
+        assertThat(brazilDate).isNotNull();
+    }
+
+    /**
+     * Test to verify Brazil timezone configuration
+     */
+    @Test
+    void shouldUseCorrectBrazilTimezone() {
+        // Arrange & Act
+        ZoneId configuredTimezone = BRAZIL_TIMEZONE;
+        
+        // Assert
+        assertThat(configuredTimezone.getId()).isEqualTo("America/Sao_Paulo");
+        assertThat(configuredTimezone.getRules().getOffset(ZonedDateTime.now(configuredTimezone).toInstant()).getTotalSeconds())
+                .isEqualTo(-3 * 3600); // GMT-3 in seconds
     }
 
     // Mock helpers

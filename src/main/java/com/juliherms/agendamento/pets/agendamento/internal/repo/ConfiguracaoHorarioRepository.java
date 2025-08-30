@@ -29,3 +29,4 @@ public interface ConfiguracaoHorarioRepository extends JpaRepository<Configuraca
      */
     boolean existsByDiaSemanaAndAtivoTrue(DayOfWeek diaSemana);
 }
+

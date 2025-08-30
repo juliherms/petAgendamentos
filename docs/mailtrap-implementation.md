@@ -261,3 +261,4 @@ export MAILTRAP_FROM=no-reply@pets.dev
 - Verifique configurações SMTP no log de inicialização
 - Use endpoints de teste para validar funcionalidade
 
+

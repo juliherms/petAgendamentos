@@ -59,3 +59,4 @@ public interface AgendamentoApi {
             LocalTime horaFim
     ) {}
 }
+
