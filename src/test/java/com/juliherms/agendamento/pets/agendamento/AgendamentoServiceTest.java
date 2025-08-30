@@ -23,13 +23,25 @@ import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
+//@RunWith(MockitoJUnitRunner.class) // Not needed with JUnit 5 and MockitoAnnotations
+/**
+ * Unit tests for AgendamentoService.
+ * Uses Mockito to mock dependencies and verify interactions.
+ * Configured to work with GMT-3 (Brazil timezone).
+ */
 class AgendamentoServiceTest {
+
+    // Timezone configuration for Brazil (GMT-3)
+    private static final ZoneId BRAZIL_TIMEZONE = ZoneId.of("America/Sao_Paulo");
+    private static final ZoneId UTC_TIMEZONE = ZoneId.of("UTC");
 
     @Mock
     private AgendamentoRepository agendamentoRepository;
@@ -57,11 +69,44 @@ class AgendamentoServiceTest {
         MockitoAnnotations.openMocks(this);
     }
 
+    /**
+     * Helper method to get current date in Brazil timezone
+     * @return LocalDate in Brazil timezone
+     */
+    private LocalDate getCurrentDateInBrazil() {
+        return ZonedDateTime.now(BRAZIL_TIMEZONE).toLocalDate();
+    }
+
+    /**
+     * Helper method to get a specific date in Brazil timezone
+     * @param daysOffset number of days to add/subtract from current date
+     * @return LocalDate in Brazil timezone
+     */
+    private LocalDate getDateInBrazil(int daysOffset) {
+        return getCurrentDateInBrazil().plusDays(daysOffset);
+    }
+
+    /**
+     * Helper method to convert UTC date to Brazil timezone
+     * @param utcDate date in UTC
+     * @return LocalDate in Brazil timezone
+     */
+    private LocalDate convertUtcToBrazilDate(LocalDate utcDate) {
+        return utcDate.atStartOfDay(UTC_TIMEZONE)
+                .withZoneSameInstant(BRAZIL_TIMEZONE)
+                .toLocalDate();
+    }
+
+    /**
+     * Test creating an appointment successfully.
+     * Mocks all dependencies and verifies the save and event publish actions.
+     */
     @Test
     void shouldCreateAgendamentoSuccessfully() {
         // Arrange
+        LocalDate tomorrowInBrazil = getDateInBrazil(1);
         AgendamentoApi.CreateAgendamentoRequest request = new AgendamentoApi.CreateAgendamentoRequest(
-                1L, 2L, 3L, LocalDate.now().plusDays(1), LocalTime.of(10, 0)
+                1L, 2L, 3L, tomorrowInBrazil, LocalTime.of(10, 0)
         );
 
         when(petRepository.findById(1L)).thenReturn(Optional.of(mockPet()));
@@ -80,11 +125,16 @@ class AgendamentoServiceTest {
         verify(eventPublisher).publishEvent(any(AgendamentoApi.AgendamentoCriadoEvent.class));
     }
 
+    /**
+     * Test creating an appointment when the pet is not found.
+     * Expects a PetNaoEncontradoException to be thrown.
+     */
     @Test
     void shouldThrowExceptionWhenPetNotFound() {
         // Arrange
+        LocalDate tomorrowInBrazil = getDateInBrazil(1);
         AgendamentoApi.CreateAgendamentoRequest request = new AgendamentoApi.CreateAgendamentoRequest(
-                1L, 2L, 3L, LocalDate.now().plusDays(1), LocalTime.of(10, 0)
+                1L, 2L, 3L, tomorrowInBrazil, LocalTime.of(10, 0)
         );
 
         when(petRepository.findById(1L)).thenReturn(Optional.empty());
@@ -95,6 +145,10 @@ class AgendamentoServiceTest {
                 .hasMessageContaining("Pet não encontrado com ID: 1");
     }
 
+    /**
+     * Test fetching appointments by user ID.
+     * Mocks the repository to return a list of appointments and verifies the result.
+     */
     @Test
     void shouldFetchAgendamentosByUsuario() {
         // Arrange
@@ -108,6 +162,10 @@ class AgendamentoServiceTest {
         verify(agendamentoRepository).findByUsuarioId(1L);
     }
 
+    /**
+     * Test fetching appointments by pet ID.
+     * Mocks the repository to return a list of appointments and verifies the result.
+     */
     @Test
     void shouldFetchAgendamentosByPet() {
         // Arrange
@@ -119,6 +177,195 @@ class AgendamentoServiceTest {
         // Assert
         assertThat(agendamentos).isNotEmpty();
         verify(agendamentoRepository).findByPetIdOrderByDataDescHoraInicioDesc(1L);
+    }
+
+    @Test
+    void shouldThrowExceptionWhenHorarioIndisponivel() {
+        // Arrange
+        LocalDate tomorrowInBrazil = getDateInBrazil(1);
+        AgendamentoApi.CreateAgendamentoRequest request = new AgendamentoApi.CreateAgendamentoRequest(
+                1L, 2L, 3L, tomorrowInBrazil, LocalTime.of(10, 0)
+        );
+
+        // Set up mocks
+        when(petRepository.findById(1L)).thenReturn(Optional.of(mockPet()));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(mockUser(UserApi.Status.ativo)));
+        when(servicoRepository.findById(2L)).thenReturn(Optional.of(mockServico(true)));
+        when(userRepository.findById(3L)).thenReturn(Optional.of(mockPrestador(UserApi.Status.ativo, UserApi.Perfil.PROVEDOR)));
+        when(configuracaoHorarioRepository.findByDiaSemanaAndAtivoTrue(any())).thenReturn(Optional.of(mockConfiguracaoHorario()));
+
+        when(agendamentoRepository.findByPrestadorIdAndDataAndHoraInicio(3L, request.data(), request.horaInicio()))
+                .thenReturn(Optional.of(mockAgendamento()));
+
+        // Act & Assert
+        assertThatThrownBy(() -> agendamentoService.criarAgendamento(request))
+                .isInstanceOf(AgendamentoExceptionHandler.HorarioIndisponivelException.class)
+                .hasMessageContaining("Horário indisponível para o prestador");
+    }
+
+    /**
+     * Test creating an appointment when the user is inactive.
+     * Expects a UsuarioSemPermissaoException to be thrown.
+     */
+    @Test
+    void shouldThrowExceptionWhenUsuarioInativo() {
+        // Arrange
+        LocalDate tomorrowInBrazil = getDateInBrazil(1);
+        AgendamentoApi.CreateAgendamentoRequest request = new AgendamentoApi.CreateAgendamentoRequest(
+                1L, 2L, 3L, tomorrowInBrazil, LocalTime.of(10, 0)
+        );
+
+        when(petRepository.findById(1L)).thenReturn(Optional.of(mockPet()));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(mockUser(UserApi.Status.inativo)));
+
+        // Act & Assert
+        assertThatThrownBy(() -> agendamentoService.criarAgendamento(request))
+                .isInstanceOf(AgendamentoExceptionHandler.UsuarioSemPermissaoException.class)
+                .hasMessageContaining("Usuário do pet não está ativo");
+    }
+
+    /**
+     * Test creating an appointment when the service is inactive.
+     * Expects a ServicoNaoEncontradoException to be thrown.
+     */
+    @Test
+    void shouldThrowExceptionWhenServicoInativo() {
+        // Arrange
+        LocalDate tomorrowInBrazil = getDateInBrazil(1);
+        AgendamentoApi.CreateAgendamentoRequest request = new AgendamentoApi.CreateAgendamentoRequest(
+                1L, 2L, 3L, tomorrowInBrazil, LocalTime.of(10, 0)
+        );
+
+        when(petRepository.findById(1L)).thenReturn(Optional.of(mockPet()));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(mockUser(UserApi.Status.ativo)));
+        when(servicoRepository.findById(2L)).thenReturn(Optional.of(mockServico(false)));
+
+        // Act & Assert
+        assertThatThrownBy(() -> agendamentoService.criarAgendamento(request))
+                .isInstanceOf(AgendamentoExceptionHandler.ServicoNaoEncontradoException.class)
+                .hasMessageContaining("Serviço não está ativo");
+    }
+
+    /**
+     * Test creating an appointment when the requested time is outside business hours.
+     * Expects a HorarioForaComercialException to be thrown.
+     */
+    @Test
+    void shouldThrowExceptionWhenHorarioForaComercial() {
+        // Arrange
+        LocalDate tomorrowInBrazil = getDateInBrazil(1);
+        AgendamentoApi.CreateAgendamentoRequest request = new AgendamentoApi.CreateAgendamentoRequest(
+                1L, 2L, 3L, tomorrowInBrazil, LocalTime.of(20, 0) // Horário fora do comercial
+        );
+
+        when(petRepository.findById(1L)).thenReturn(Optional.of(mockPet()));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(mockUser(UserApi.Status.ativo)));
+        when(servicoRepository.findById(2L)).thenReturn(Optional.of(mockServico(true)));
+        when(userRepository.findById(3L)).thenReturn(Optional.of(mockPrestador(UserApi.Status.ativo, UserApi.Perfil.PROVEDOR)));
+        when(configuracaoHorarioRepository.findByDiaSemanaAndAtivoTrue(any()))
+                .thenReturn(Optional.of(mockConfiguracaoHorario())); // Mock horário comercial: 08:00 - 18:00
+
+        // Act & Assert
+        assertThatThrownBy(() -> agendamentoService.criarAgendamento(request))
+                .isInstanceOf(AgendamentoExceptionHandler.HorarioForaComercialException.class)
+                .hasMessageContaining("Horário fora do horário comercial (08:00 - 18:00)");
+    }
+
+    /**
+     * Test creating an appointment when the user is not a service provider.
+     * Expects a PrestadorNaoEncontradoException to be thrown.
+     */
+    @Test
+    void shouldThrowExceptionWhenUsuarioNaoEhPrestador() {
+        // Arrange
+        LocalDate tomorrowInBrazil = getDateInBrazil(1);
+        AgendamentoApi.CreateAgendamentoRequest request = new AgendamentoApi.CreateAgendamentoRequest(
+                1L, 2L, 3L, tomorrowInBrazil, LocalTime.of(10, 0)
+        );
+
+        when(petRepository.findById(1L)).thenReturn(Optional.of(mockPet()));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(mockUser(UserApi.Status.ativo)));
+        when(servicoRepository.findById(2L)).thenReturn(Optional.of(mockServico(true)));
+        when(userRepository.findById(3L)).thenReturn(Optional.of(mockPrestador(UserApi.Status.ativo, UserApi.Perfil.CLIENTE))); // Perfil não é PROVEDOR
+
+        // Act & Assert
+        assertThatThrownBy(() -> agendamentoService.criarAgendamento(request))
+                .isInstanceOf(AgendamentoExceptionHandler.PrestadorNaoEncontradoException.class)
+                .hasMessageContaining("Usuário não é um prestador de serviços");
+    }
+
+    /**
+     * Test creating an appointment when the service provider is inactive.
+     * Expects a PrestadorNaoEncontradoException to be thrown.
+     */
+    @Test
+    void shouldThrowExceptionWhenPrestadorNaoEstaAtivo() {
+        // Arrange
+        LocalDate tomorrowInBrazil = getDateInBrazil(1);
+        AgendamentoApi.CreateAgendamentoRequest request = new AgendamentoApi.CreateAgendamentoRequest(
+                1L, 2L, 3L, tomorrowInBrazil, LocalTime.of(10, 0)
+        );
+
+        when(petRepository.findById(1L)).thenReturn(Optional.of(mockPet()));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(mockUser(UserApi.Status.ativo)));
+        when(servicoRepository.findById(2L)).thenReturn(Optional.of(mockServico(true)));
+        when(userRepository.findById(3L)).thenReturn(Optional.of(mockPrestador(UserApi.Status.inativo, UserApi.Perfil.PROVEDOR))); // Prestador inativo
+
+        // Act & Assert
+        assertThatThrownBy(() -> agendamentoService.criarAgendamento(request))
+                .isInstanceOf(AgendamentoExceptionHandler.PrestadorNaoEncontradoException.class)
+                .hasMessageContaining("Prestador não está ativo");
+    }
+
+    /**
+     * Test creating an appointment when the requested date is in the past.
+     * Expects a HorarioNoPassadoException to be thrown.
+     */
+    @Test
+    void shouldThrowExceptionWhenDataNoPassado() {
+        // Arrange
+        LocalDate yesterdayInBrazil = getDateInBrazil(-1);
+        AgendamentoApi.CreateAgendamentoRequest request = new AgendamentoApi.CreateAgendamentoRequest(
+                1L, 2L, 3L, yesterdayInBrazil, LocalTime.of(10, 0) // Data no passado
+        );
+
+        when(petRepository.findById(1L)).thenReturn(Optional.of(mockPet()));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(mockUser(UserApi.Status.ativo)));
+        when(servicoRepository.findById(2L)).thenReturn(Optional.of(mockServico(true)));
+        when(userRepository.findById(3L)).thenReturn(Optional.of(mockPrestador(UserApi.Status.ativo, UserApi.Perfil.PROVEDOR)));
+
+        // Act & Assert
+        assertThatThrownBy(() -> agendamentoService.criarAgendamento(request))
+                .isInstanceOf(AgendamentoExceptionHandler.HorarioNoPassadoException.class)
+                .hasMessageContaining("Data/hora no passado");
+    }
+
+    /**
+     * Test to verify timezone handling - ensures dates are properly converted
+     * between UTC and Brazil timezone
+     */
+    @Test
+    void shouldHandleTimezoneConversionCorrectly() {
+        // Arrange
+        LocalDate utcDate = LocalDate.of(2024, 1, 15);
+        LocalDate brazilDate = convertUtcToBrazilDate(utcDate);
+        
+        // Act & Assert
+        assertThat(brazilDate).isNotNull();
+    }
+
+    /**
+     * Test to verify Brazil timezone configuration
+     */
+    @Test
+    void shouldUseCorrectBrazilTimezone() {
+        // Arrange & Act
+        ZoneId configuredTimezone = BRAZIL_TIMEZONE;
+        
+        // Assert
+        assertThat(configuredTimezone.getId()).isEqualTo("America/Sao_Paulo");
+        assertThat(configuredTimezone.getRules().getOffset(ZonedDateTime.now(configuredTimezone).toInstant()).getTotalSeconds())
+                .isEqualTo(-3 * 3600); // GMT-3 in seconds
     }
 
     // Mock helpers

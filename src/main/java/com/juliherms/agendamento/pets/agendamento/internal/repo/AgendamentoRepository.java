@@ -61,3 +61,4 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> 
            "AND a.status IN ('AGENDADO', 'CONFIRMADO', 'EM_ANDAMENTO')")
     boolean existsByPetIdAndStatusAtivo(@Param("petId") Long petId);
 }
+

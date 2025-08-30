@@ -276,3 +276,4 @@ record AgendamentoCriadoEvent(
 - Verificar configurações de horário no banco
 - Validar dados de entrada
 - Testar endpoints individualmente
+

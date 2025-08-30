@@ -159,3 +159,4 @@ public class Agendamento {
         this.updatedAt = updatedAt;
     }
 }
+

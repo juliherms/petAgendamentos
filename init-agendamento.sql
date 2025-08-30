@@ -95,3 +95,4 @@ ORDER BY
         WHEN 'SATURDAY' THEN 6
         WHEN 'SUNDAY' THEN 7
     END;
+
